@@ -1,0 +1,14 @@
+[submodule "packages/foundry/lib/openzeppelin-contracts"]
+	path = packages/foundry/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+	branch = release-v5.2
+[submodule "packages/foundry/lib/prb-math"]
+	path = packages/foundry/lib/prb-math
+	url = https://github.com/PaulRBerg/prb-math
+	branch = release-v4
+[submodule "packages/foundry/lib/solidity-bytes-utils"]
+	path = packages/foundry/lib/solidity-bytes-utils
+	url = https://github.com/GNSPS/solidity-bytes-utils
+[submodule "packages/foundry/lib/forge-std"]
+	path = packages/foundry/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
