@@ -3,10 +3,14 @@ pragma solidity ^0.8.30;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { UD60x18, powu, sqrt, ud } from "@prb/math/src/UD60x18.sol";
-import { SD59x18, sd } from "@prb/math/src/SD59x18.sol";
+import { UD60x18, convert, powu, sqrt } from "@prb/math/src/UD60x18.sol";
+import { SD59x18 } from "@prb/math/src/SD59x18.sol";
 
+import { tokToUD, UDToTok } from "./Conversions.sol";
 import { ERC20Ownable } from "./ERC20Ownable.sol";
+
+using { tokToUD } for uint256;
+using { UDToTok } for UD60x18;
 
 /// @title EnergyAMM: An Automated Market Maker (AMM) for the trading of energy.
 /// @author Mitchel Justinen
@@ -125,46 +129,21 @@ contract EnergyAMM is Ownable {
         LToken = new ERC20Ownable("EnergyAMM Liquidity Token", "ELIQ", _EToken.decimals());
     }
 
-    /// @dev Converts an amount of an ERC20 token from its native representation to a UD60x18.
-    /// @param value The token amount in the token's native representation.
-    /// @param token The token.
-    /// @return A UD60x18 equivalent to `value`.
-    function tokToUD(uint256 value, IERC20Metadata token) internal view returns (UD60x18) {
-        uint8 decimals = token.decimals();
-        if (decimals < 18) {
-            return UD60x18.wrap(value / (10**(decimals - 18)));
-        } else {
-            return UD60x18.wrap(value * (10**(18 - decimals)));
-        }
-    }
-
-    /// @dev Converts an amount of an ERC20 token from a UD60x18 to its native representation.
-    /// @param value The token amount in a UD60x18.
-    /// @param token The token.
-    /// @return A value equivalent to `value` in `token`'s native representation.
-    function UDToTok(UD60x18 value, IERC20Metadata token) internal view returns (uint256) {
-        uint8 decimals = token.decimals();
-        if (decimals < 18) {
-            return value.unwrap() * (10**(decimals - 18));
-        } else {
-            return value.unwrap() / (10**(18 - decimals));
-        }
-    }
-
     /// @dev Calculates the liquidity of the market and the amount of virtual assets in the
     /// liquidity pool. Should be executed after any operation which changes the market state.
     function calculateLiquidity() internal {
-        UD60x18 a = ud(1) - sqrt(poolPriceBoundLower / poolPriceBoundUpper);
-        UD60x18 b = tokToUD(this.MReserve(), MToken) / sqrt(poolPriceBoundUpper) +
-            tokToUD(this.EReserve(), EToken) * sqrt(poolPriceBoundLower);
-        UD60x18 c = tokToUD(this.MReserve(), MToken) * tokToUD(this.EReserve(), EToken);
+        UD60x18 M = this.MReserve().tokToUD(MToken); 
+        UD60x18 E = this.EReserve().tokToUD(EToken); 
 
-        liquidity = (b + sqrt(powu(b, 2) + ud(4) * a * c)) / (ud(2) * a);
+        UD60x18 a = convert(1) - sqrt(poolPriceBoundLower / poolPriceBoundUpper);
+        UD60x18 b = M / sqrt(poolPriceBoundUpper) + E * sqrt(poolPriceBoundLower);
+        UD60x18 c = M * E;
 
-        MVirtual = UDToTok(liquidity * sqrt(poolPriceBoundLower), MToken);
-        EVirtual = UDToTok(liquidity / sqrt(poolPriceBoundUpper), EToken);
+        liquidity = (b + sqrt(powu(b, 2) + convert(4) * a * c)) / (convert(2) * a);
+
+        MVirtual = (liquidity * sqrt(poolPriceBoundLower)).UDToTok(MToken);
+        EVirtual = (liquidity / sqrt(poolPriceBoundUpper)).UDToTok(EToken);
     }
-
 
     /// @notice Returns the amount of MTokens in the liquidity pool.
     /// @return The amount of MTokens in the liquidity pool.
@@ -182,8 +161,8 @@ contract EnergyAMM is Ownable {
     /// pool.
     /// @return The pool price.
     function poolPrice() external view returns (UD60x18) {
-        return tokToUD(this.MReserve() + MVirtual, MToken) /
-            tokToUD(this.EReserve() + EVirtual, EToken);
+        return (this.MReserve() + MVirtual).tokToUD(MToken) /
+            (this.EReserve() + EVirtual).tokToUD(EToken);
     }
 
     /// @notice Returns the swap amounts for buying ETokens, before fees are applied.
@@ -197,10 +176,8 @@ contract EnergyAMM is Ownable {
             return (0, 0);
         }
 
-        MSwap = UDToTok(
-            powu(liquidity, 2) / tokToUD(this.EReserve() + EVirtual - EAmount, EToken) -
-                tokToUD(this.MReserve() + MVirtual, MToken),
-            MToken);
+        MSwap = (powu(liquidity, 2) / (this.EReserve() + EVirtual - EAmount).tokToUD(EToken) -
+            (this.MReserve() + MVirtual).tokToUD(MToken)).UDToTok(MToken);
         ESwap = EAmount;
     }
 
@@ -215,10 +192,8 @@ contract EnergyAMM is Ownable {
             return (0, 0);
         }
 
-        MSwap = UDToTok(
-            tokToUD(this.MReserve() + MVirtual, MToken) - 
-                powu(liquidity, 2) / tokToUD(this.EReserve() + EVirtual + EAmount, EToken),
-            MToken);
+        MSwap = ((this.MReserve() + MVirtual).tokToUD(MToken) - powu(liquidity, 2) /
+                 (this.EReserve() + EVirtual + EAmount).tokToUD(EToken)).UDToTok(MToken);
         ESwap = EAmount;
     }
 
@@ -232,7 +207,7 @@ contract EnergyAMM is Ownable {
 
         (uint256 MSwap,) = this.bidSwap(EAmount);
 
-        return UDToTok(tokToUD(MSwap, MToken) * feeRate, MToken);
+        return (MSwap.tokToUD(MToken) * feeRate).UDToTok(MToken);
     }
 
     /// @notice Returns the amount of MTokens required to fulfill the fee for selling ETokens.
@@ -245,7 +220,7 @@ contract EnergyAMM is Ownable {
 
         (uint256 MSwap, uint256 ESwap) = this.askSwap(EAmount);
 
-        uint256 EAmountWithFee = UDToTok(tokToUD(ESwap, EToken) / (ud(1) - feeRate), EToken);
+        uint256 EAmountWithFee = (ESwap.tokToUD(EToken) / (convert(1) - feeRate)).UDToTok(EToken);
 
         (uint256 MSwapWithFee,) = this.askSwap(EAmountWithFee);
 
@@ -257,11 +232,11 @@ contract EnergyAMM is Ownable {
     /// @return The price of energy.
     function bidPrice(uint256 EAmount) external view returns (UD60x18) {
         if (EAmount == 0) {
-            return ud(0);
+            return convert(0);
         }
 
         (uint256 MSwap, uint256 ESwap) = this.bidSwap(EAmount);
-        return tokToUD(MSwap, MToken) / tokToUD(ESwap, EToken);
+        return MSwap.tokToUD(MToken) / ESwap.tokToUD(EToken);
     }
 
     /// @notice Returns the price of energy when selling.
@@ -269,11 +244,11 @@ contract EnergyAMM is Ownable {
     /// @return The price of energy.
     function askPrice(uint256 EAmount) external view returns (UD60x18) {
         if (EAmount == 0) {
-            return ud(0);
+            return convert(0);
         }
 
         (uint256 MSwap, uint256 ESwap) = this.askSwap(EAmount);
-        return tokToUD(MSwap, MToken) / tokToUD(ESwap, EToken);
+        return MSwap.tokToUD(MToken) / ESwap.tokToUD(EToken);
     }
 
     /// @notice Returns the bid-ask spread, which is the difference between the ask price and the
@@ -289,7 +264,7 @@ contract EnergyAMM is Ownable {
     /// @param EAmount The amount of ETokens to buy.
     /// @return The slippage of the bid.
     function bidSlippage(uint256 EAmount) external view returns (SD59x18) {
-        return this.bidPrice(EAmount).intoSD59x18() / this.poolPrice().intoSD59x18() - sd(1);
+        return (this.bidPrice(EAmount) / this.poolPrice()).intoSD59x18() + convert(1).intoSD59x18();
     }
 
     /// @notice Returns the slippage of a ask, which is the proportional difference between the ask
@@ -297,7 +272,7 @@ contract EnergyAMM is Ownable {
     /// @param EAmount The amount of ETokens to sell.
     /// @return The slippage of the ask.
     function askSlippage(uint256 EAmount) external view returns (SD59x18) {
-        return this.askPrice(EAmount).intoSD59x18() / this.poolPrice().intoSD59x18() - sd(1);
+        return (this.askPrice(EAmount) / this.poolPrice()).intoSD59x18() - convert(1).intoSD59x18();
     }
 
     /// @notice Returns the amount of MTokens and ETokens required to add an specific amount of
@@ -312,13 +287,11 @@ contract EnergyAMM is Ownable {
             return (0, 0);
         }
 
-        MLiq = UDToTok(
-            tokToUD(this.EReserve() + EAmount, EToken) *
-                sqrt(poolPriceEquilibrium * poolPriceBoundUpper) *
-                (sqrt(poolPriceEquilibrium) - sqrt(poolPriceBoundLower)) /
-                (sqrt(poolPriceBoundUpper) - sqrt(poolPriceEquilibrium)) -
-                tokToUD(this.MReserve(), MToken),
-            MToken);
+        MLiq = ((this.EReserve() + EAmount).tokToUD(EToken) *
+                    sqrt(poolPriceEquilibrium * poolPriceBoundUpper) *
+                    (sqrt(poolPriceEquilibrium) - sqrt(poolPriceBoundLower)) /
+                    (sqrt(poolPriceBoundUpper) - sqrt(poolPriceEquilibrium)) -
+                    (this.MReserve()).tokToUD(MToken)).UDToTok(MToken);
         ELiq = EAmount;
     }
 
@@ -440,7 +413,7 @@ contract EnergyAMM is Ownable {
 
         poolPriceBoundLower = lower;
         poolPriceBoundUpper = upper;
-        poolPriceEquilibrium = ud(4) * poolPriceBoundLower * poolPriceBoundUpper /
+        poolPriceEquilibrium = convert(4) * poolPriceBoundLower * poolPriceBoundUpper /
             powu((sqrt(poolPriceBoundLower) + sqrt(poolPriceBoundUpper)), 2);
     }
 
@@ -491,8 +464,8 @@ contract EnergyAMM is Ownable {
             uint256 LAmount = LToken.balanceOf(provider);
             UD60x18 proportion = tokToUD(LAmount, LToken) / tokToUD(LTotal, LToken);
 
-            uint256 MAmount = UDToTok(proportion * tokToUD(this.MReserve(), MToken), MToken);
-            uint256 EAmount = UDToTok(proportion * tokToUD(this.EReserve(), EToken), EToken);
+            uint256 MAmount = (proportion * this.MReserve().tokToUD(MToken)).UDToTok(MToken);
+            uint256 EAmount = (proportion * this.EReserve().tokToUD(EToken)).UDToTok(EToken);
 
             require(MToken.transfer(provider, MAmount),
                     "Failed to transfer MTokens to liquidity provider.");
