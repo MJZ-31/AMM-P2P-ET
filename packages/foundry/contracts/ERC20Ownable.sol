@@ -4,11 +4,13 @@ pragma solidity ^0.8.30;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract LiquidityToken is ERC20, Ownable {
+contract ERC20Ownable is ERC20, Ownable {
 
     uint8 private _decimals;
 
-    constructor(uint8 decimals_) ERC20("EnergyAMM Liquidity Token", "ELIQ") Ownable(msg.sender) {
+    constructor(string memory name_, string memory symbol_, uint8 decimals_)
+        ERC20(name_, symbol_) Ownable(msg.sender) {
+
         _decimals = decimals_;
     }
 

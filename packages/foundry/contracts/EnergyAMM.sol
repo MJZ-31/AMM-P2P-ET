@@ -6,7 +6,7 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 import { UD60x18, powu, sqrt, ud } from "@prb/math/src/UD60x18.sol";
 import { SD59x18, sd } from "@prb/math/src/SD59x18.sol";
 
-import { LiquidityToken } from "./LiquidityToken.sol";
+import { ERC20Ownable } from "./ERC20Ownable.sol";
 
 /// @title EnergyAMM: An Automated Market Maker (AMM) for the trading of energy.
 /// @author Mitchel Justinen
@@ -42,9 +42,9 @@ contract EnergyAMM is Ownable {
     IERC20Metadata public EToken;
 
     /// @notice The address of an ERC20 token representing liquidity shares.
-    /// @dev Each instantiation of this contract has its own LiquidityToken contract and has
-    /// exclusive rights to the minting and burning of LTokens.
-    LiquidityToken public LToken;
+    /// @dev Each instantiation of this contract has its own LToken contract and has exclusive
+    /// rights to mint and burn the LTokens.
+    ERC20Ownable public LToken;
 
     /// @dev The addresses of liquidity providers.
     address[] private liquidityProviders;
@@ -122,7 +122,7 @@ contract EnergyAMM is Ownable {
     constructor(IERC20Metadata _MToken, IERC20Metadata _EToken) Ownable(msg.sender) {
         MToken = _MToken;
         EToken = _EToken;
-        LToken = new LiquidityToken(_EToken.decimals());
+        LToken = new ERC20Ownable("EnergyAMM Liquidity Token", "ELIQ", _EToken.decimals());
     }
 
     /// @dev Converts an amount of an ERC20 token from its native representation to a UD60x18.
