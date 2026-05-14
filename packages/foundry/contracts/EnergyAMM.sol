@@ -182,7 +182,8 @@ contract EnergyAMM is Ownable {
     /// pool.
     /// @return The pool price.
     function poolPrice() external view returns (UD60x18) {
-        return tokToUD(this.MReserve(), MToken) / tokToUD(this.EReserve(), EToken);
+        return tokToUD(this.MReserve() + MVirtual, MToken) /
+            tokToUD(this.EReserve() + EVirtual, EToken);
     }
 
     /// @notice Returns the swap amounts for buying ETokens, before fees are applied.
