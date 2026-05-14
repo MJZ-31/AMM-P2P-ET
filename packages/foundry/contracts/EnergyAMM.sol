@@ -50,15 +50,15 @@ contract EnergyAMM is Ownable {
     address[] private liquidityProviders;
 
     /// @dev The liquidity constant of the pricing function.
-    UD60x18 private liquidity;
+    UD60x18 public liquidity;
 
     /// @dev The amount of virtual MTokens in the liquidity pool. These cannot leave the liquidity
     /// pool, and exist purely to force the pool price into a specific range.
-    uint256 private MVirtual;
+    uint256 public MVirtual;
 
     /// @dev The amount of virtual ETokens in the liquidity pool. These cannot leave the liquidity
     /// pool, and exist purely to force the pool price into a specific range.
-    uint256 private EVirtual;
+    uint256 public EVirtual;
 
     /// @notice The lowest possible pool price.
     UD60x18 public poolPriceBoundLower;
