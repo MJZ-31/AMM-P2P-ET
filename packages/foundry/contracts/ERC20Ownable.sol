@@ -5,12 +5,9 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract ERC20Ownable is ERC20, Ownable {
-
     uint8 private _decimals;
 
-    constructor(string memory name_, string memory symbol_, uint8 decimals_)
-        ERC20(name_, symbol_) Ownable(msg.sender) {
-
+    constructor(string memory name_, string memory symbol_, uint8 decimals_) ERC20(name_, symbol_) Ownable(msg.sender) {
         _decimals = decimals_;
     }
 
@@ -18,11 +15,11 @@ contract ERC20Ownable is ERC20, Ownable {
         return _decimals;
     }
 
-    function mint(address account, uint256 value) external onlyOwner() {
+    function mint(address account, uint256 value) external onlyOwner {
         _mint(account, value);
     }
 
-    function burn(address account, uint256 value) external onlyOwner() {
+    function burn(address account, uint256 value) external onlyOwner {
         _burn(account, value);
     }
 }

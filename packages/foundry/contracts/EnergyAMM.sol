@@ -12,128 +12,178 @@ import { ERC20Ownable } from "./ERC20Ownable.sol";
 using { tokToUD } for uint256;
 using { UDToTok } for UD60x18;
 
-/// @title EnergyAMM: An Automated Market Maker (AMM) for the trading of energy.
-/// @author Mitchel Justinen
-/// @notice This contract is responsible for maintaining a liquidity pool containing reserves of
-/// tokens representing energy and money, and provides methods for trading, liquidity provision,
-/// and market regulation.
+/**
+ * @title EnergyAMM: An Automated Market Maker (AMM) for the trading of energy.
+ * @author Mitchel Justinen
+ * @notice This contract is responsible for maintaining a liquidity pool containing reserves of tokens representing
+ * energy and money, and provides methods for trading, liquidity provision, and market regulation.
+ */
 contract EnergyAMM is Ownable {
-
-    /// @title Information about a liquidity addition.
+    /**
+     * @title Information about a liquidity addition.
+     */
     struct LiquidityAdditionInfo {
-        address provider;   // The address of the liquidity provider.
-        uint256 MAmount;    // The amount of MTokens added.
-        uint256 EAmount;    // The amount of ETokens added.
+        address provider; // The address of the liquidity provider.
+        uint256 MAmount; // The amount of MTokens added.
+        uint256 EAmount; // The amount of ETokens added.
     }
 
-    /// @title Information about a transaction.
+    /**
+     * @title Information about a transaction.
+     */
     struct TransactionInfo {
-        address trader;     // The address of the trader.
-        string transType;   // The type of transaction, either "buy" or "sell".
-        uint256 MAmount;    // The amount of MTokens swapped.
-        uint256 EAmount;    // The amount of ETokens swapped.
-        uint256 fee;        // The amount of MTokens taken as a transaction fee.
-        UD60x18 poolPrice;  // The pool price at the time of the swap.
+        address trader; // The address of the trader.
+        string transType; // The type of transaction, either "buy" or "sell".
+        uint256 MAmount; // The amount of MTokens swapped.
+        uint256 EAmount; // The amount of ETokens swapped.
+        uint256 fee; // The amount of MTokens taken as a transaction fee.
+        UD60x18 poolPrice; // The pool price at the time of the swap.
         UD60x18 transPrice; // The per-EToken price of the transaction.
-        SD59x18 slippage;   // The proportional difference between the transaction and pool price.
+        SD59x18 slippage; // The proportional difference between the transaction and pool price.
     }
 
-    /// @notice The address of an ERC20 token representing currencty.
-    /// @dev Ideally, this should be a stablecoin or some other representation of real currency.
+    /**
+     * @notice The address of an ERC20 token representing currencty.
+     * @dev Ideally, this should be a stablecoin or some other representation of real currency.
+     */
     IERC20Metadata public MToken;
 
-    /// @notice The address of an ERC20 token representing energy in kWh.
+    /**
+     * @notice The address of an ERC20 token representing energy in kWh.
+     */
     IERC20Metadata public EToken;
 
-    /// @notice The address of an ERC20 token representing liquidity shares.
-    /// @dev Each instantiation of this contract has its own LToken contract and has exclusive
-    /// rights to mint and burn the LTokens.
+    /**
+     * @notice The address of an ERC20 token representing liquidity shares.
+     * @dev Each instantiation of this contract has its own LToken contract and has exclusive rights to mint and burn
+     * the LTokens.
+     */
     ERC20Ownable public LToken;
 
-    /// @dev The addresses of liquidity providers.
+    /**
+     * @dev The addresses of liquidity providers.
+     */
     address[] private liquidityProviders;
 
-    /// @dev The liquidity constant of the pricing function.
+    /**
+     * @notice The liquidity constant of the pricing function.
+     */
     UD60x18 public liquidity;
 
-    /// @dev The amount of virtual MTokens in the liquidity pool. These cannot leave the liquidity
-    /// pool, and exist purely to force the pool price into a specific range.
+    /**
+     * @notice The amount of virtual MTokens in the liquidity pool. These cannot leave the liquidity pool, and exist
+     * purely to force the pool price into a specific range.
+     */
     uint256 public MVirtual;
 
-    /// @dev The amount of virtual ETokens in the liquidity pool. These cannot leave the liquidity
-    /// pool, and exist purely to force the pool price into a specific range.
+    /**
+     * @notice The amount of virtual ETokens in the liquidity pool. These cannot leave the liquidity pool, and exist
+     * purely to force the pool price into a specific range.
+     */
     uint256 public EVirtual;
 
-    /// @notice The lowest possible pool price.
+    /**
+     * @notice The lowest possible pool price.
+     */
     UD60x18 public poolPriceBoundLower;
 
-    /// @notice The highest possible pool price.
+    /**
+     * @notice The highest possible pool price.
+     */
     UD60x18 public poolPriceBoundUpper;
 
-    /// @notice The pool price whether the amount of ETokens in the liquidity pool is halfway
-    /// between the minimum and maximum amounts.
+    /**
+     * @notice The pool price where the amount of ETokens in the liquidity pool is halfway between the minimum and
+     * maximum amounts.
+     */
     UD60x18 public poolPriceEquilibrium;
 
-    /// @notice The proportion of transactions taken as fees.
+    /**
+     * @notice The proportion of transactions taken as fees.
+     */
     UD60x18 public feeRate;
 
-    /// @notice Whether or not the market is open for liquidity addition.
+    /**
+     * @notice Whether or not the market is open for liquidity addition.
+     */
     bool public isLiquidityAdditionOpen;
 
-    /// @notice Whether or not the market is open for trading.
+    /**
+     * @notice Whether or not the market is open for trading.
+     */
     bool public isTradingOpen;
 
-    /// @notice Emitted when the market state changes, either after a liquidity addition or
-    /// transaction.
+    /**
+     * @notice Emitted when the market state changes, either after a liquidity addition or transaction.
+     */
     event MarketStateChanged();
 
-    /// @notice Emitted when the market is opened for liquidity addition.
+    /**
+     * @notice Emitted when the market is opened for liquidity addition.
+     */
     event LiquidityAdditionOpened();
 
-    /// @notice Emitted when the market is closed for liquidity addition.
+    /**
+     * @notice Emitted when the market is closed for liquidity addition.
+     */
     event LiquidityAdditionClosed();
 
-    /// @notice Emitted when the market is opened for trading.
+    /**
+     * @notice Emitted when the market is opened for trading.
+     */
     event TradingOpened();
 
-    /// @notice Emitted when the market is closed for trading.
+    /**
+     * @notice Emitted when the market is closed for trading.
+     */
     event TradingClosed();
 
-    /// @notice Emitted when the market is resolved.
+    /**
+     * @notice Emitted when the market is resolved.
+     */
     event MarketResolved();
 
-    /// @notice Thrown if a swap is attempted with a token quantity of zero.
-    /// @param MSwap The amount of MTokens in the attempted swap.
-    /// @param ESwap The amount of ETokens in the attempted swap.
+    /**
+     * @notice Thrown if a swap is attempted with a token quantity of zero.
+     * @param MSwap The amount of MTokens in the attempted swap.
+     * @param ESwap The amount of ETokens in the attempted swap.
+     */
     error ZeroSwap(uint256 MSwap, uint256 ESwap);
 
-    /// @notice Thrown if a swap attempts to remove more reserve tokens than are available.
-    /// @param _MReserve The amount of MTokens in reserve.
-    /// @param _EReserve The amount of ETokens in reserve.
-    /// @param MSwap The amount of MTokens to be removed in the attempted swap.
-    /// @param ESwap The amount of ETokens to be removed in the attempted swap.
+    /**
+     * @notice Thrown if a swap attempts to remove more reserve tokens than are available.
+     * @param _MReserve The amount of MTokens in reserve.
+     * @param _EReserve The amount of ETokens in reserve.
+     * @param MSwap The amount of MTokens to be removed in the attempted swap.
+     * @param ESwap The amount of ETokens to be removed in the attempted swap.
+     */
     error ReserveExceeded(uint256 _MReserve, uint256 _EReserve, uint256 MSwap, uint256 ESwap);
 
-    /// @notice Thrown if a transaction is attempted when the transaction is closed, such as trading
-    /// when the market is closed to trading.
+    /**
+     * @notice Thrown if a operation is attempted while the operation is closed, such as trading when the market is
+     * closed to trading.
+     */
     error OperationClosed();
 
-    /// @notice Creates a new EnergyAMM contract for trading the given MToken and EToken. The
-    /// liquidity pool will be empty and will have no registered liquidity proviers. The creator of
-    /// the contract becomes its owner.
-    /// @param _MToken The address to the MToken to trade.
-    /// @param _EToken The address to the EToken to trade.
+    /**
+     * @notice Creates a new EnergyAMM contract for trading the given MToken and EToken. The liquidity pool will be
+     * empty and will have no registered liquidity providers. The creator of the contract becomes its owner.
+     * @param _MToken The address to the MToken to trade.
+     * @param _EToken The address to the EToken to trade.
+     */
     constructor(IERC20Metadata _MToken, IERC20Metadata _EToken) Ownable(msg.sender) {
         MToken = _MToken;
         EToken = _EToken;
         LToken = new ERC20Ownable("EnergyAMM Liquidity Token", "ELIQ", _EToken.decimals());
     }
 
-    /// @dev Calculates the liquidity of the market and the amount of virtual assets in the
-    /// liquidity pool. Should be executed after any operation which changes the market state.
+    /**
+     * @dev Calculates the liquidity of the market and the amount of virtual assets in the liquidity pool. Should be
+     * executed after any operation which changes the market state.
+     */
     function calculateLiquidity() internal {
-        UD60x18 M = this.MReserve().tokToUD(MToken); 
-        UD60x18 E = this.EReserve().tokToUD(EToken); 
+        UD60x18 M = this.MReserve().tokToUD(MToken);
+        UD60x18 E = this.EReserve().tokToUD(EToken);
 
         UD60x18 a = convert(1) - sqrt(poolPriceBoundLower / poolPriceBoundUpper);
         UD60x18 b = M / sqrt(poolPriceBoundUpper) + E * sqrt(poolPriceBoundLower);
@@ -145,61 +195,69 @@ contract EnergyAMM is Ownable {
         EVirtual = (liquidity / sqrt(poolPriceBoundUpper)).UDToTok(EToken);
     }
 
-    /// @notice Returns the amount of MTokens in the liquidity pool.
-    /// @return The amount of MTokens in the liquidity pool.
+    /**
+     * @notice Returns the amount of MTokens in the liquidity pool.
+     * @return The amount of MTokens in the liquidity pool.
+     */
     function MReserve() external view returns (uint256) {
         return MToken.balanceOf(address(this));
     }
 
-    /// @notice Returns the amount of ETokens in the liquidity pool.
-    /// @return The amount of ETokens in the liquidity pool.
+    /**
+     * @notice Returns the amount of ETokens in the liquidity pool.
+     * @return The amount of ETokens in the liquidity pool.
+     */
     function EReserve() external view returns (uint256) {
         return EToken.balanceOf(address(this));
     }
 
-    /// @notice Returns the pool price, which is the ratio of MTokens to ETokens in the liquidity
-    /// pool.
-    /// @return The pool price.
+    /**
+     * @notice Returns the pool price, which is the ratio of MTokens to ETokens in the liquidity pool.
+     * @return The pool price.
+     */
     function poolPrice() external view returns (UD60x18) {
-        return (this.MReserve() + MVirtual).tokToUD(MToken) /
-            (this.EReserve() + EVirtual).tokToUD(EToken);
+        return (this.MReserve() + MVirtual).tokToUD(MToken) / (this.EReserve() + EVirtual).tokToUD(EToken);
     }
 
-    /// @notice Returns the swap amounts for buying ETokens, before fees are applied.
-    /// @param EAmount The amount of ETokens to buy.
-    /// @return MSwap The amount of MTokens that will be transfered from the user to the liquidity 
-    /// pool.
-    /// @return ESwap The amount of ETokens that will be transfered from the liquidity pool to the
-    /// user.
+    /**
+     * @notice Returns the swap amounts for buying ETokens, before fees are applied.
+     * @param EAmount The amount of ETokens to buy.
+     * @return MSwap The amount of MTokens that will be transfered from the user to the liquidity pool.
+     * @return ESwap The amount of ETokens that will be transfered from the liquidity pool to the user.
+     */
     function bidSwap(uint256 EAmount) external view returns (uint256 MSwap, uint256 ESwap) {
         if (EAmount == 0) {
             return (0, 0);
         }
 
-        MSwap = (powu(liquidity, 2) / (this.EReserve() + EVirtual - EAmount).tokToUD(EToken) -
-            (this.MReserve() + MVirtual).tokToUD(MToken)).UDToTok(MToken);
+        MSwap = (powu(liquidity, 2) / (this.EReserve() + EVirtual - EAmount).tokToUD(EToken)
+                - (this.MReserve() + MVirtual).tokToUD(MToken))
+        .UDToTok(MToken);
         ESwap = EAmount;
     }
 
-    /// @notice Returns the swap amounts for selling ETokens, before fees are applied.
-    /// @param EAmount The amount of ETokens to sell.
-    /// @return MSwap The amount of MTokens that will be transfered from the liquidity pool to the
-    /// user.
-    /// @return ESwap The amount of ETokens that will be transfered from the user to the liquidity
-    /// pool.
+    /**
+     * @notice Returns the swap amounts for selling ETokens, before fees are applied.
+     * @param EAmount The amount of ETokens to sell.
+     * @return MSwap The amount of MTokens that will be transfered from the liquidity pool to the user.
+     * @return ESwap The amount of ETokens that will be transfered from the user to the liquidity pool.
+     */
     function askSwap(uint256 EAmount) external view returns (uint256 MSwap, uint256 ESwap) {
         if (EAmount == 0) {
             return (0, 0);
         }
 
-        MSwap = ((this.MReserve() + MVirtual).tokToUD(MToken) - powu(liquidity, 2) /
-                 (this.EReserve() + EVirtual + EAmount).tokToUD(EToken)).UDToTok(MToken);
+        MSwap = ((this.MReserve() + MVirtual).tokToUD(MToken) - powu(liquidity, 2)
+                / (this.EReserve() + EVirtual + EAmount).tokToUD(EToken))
+        .UDToTok(MToken);
         ESwap = EAmount;
     }
 
-    /// @notice Returns the amount of MTokens required to fulfill the fee for buying ETokens.
-    /// @param EAmount The amount of ETokens to buy.
-    /// @return The fee amount.
+    /**
+     * @notice Returns the amount of MTokens required to fulfill the fee for buying ETokens.
+     * @param EAmount The amount of ETokens to buy.
+     * @return The fee amount.
+     */
     function bidFee(uint256 EAmount) external view returns (uint256) {
         if (EAmount == 0) {
             return 0;
@@ -210,9 +268,11 @@ contract EnergyAMM is Ownable {
         return (MSwap.tokToUD(MToken) * feeRate).UDToTok(MToken);
     }
 
-    /// @notice Returns the amount of MTokens required to fulfill the fee for selling ETokens.
-    /// @param EAmount the amount of ETokens to sell.
-    /// @return The fee amount.
+    /**
+     * @notice Returns the amount of MTokens required to fulfill the fee for selling ETokens.
+     * @param EAmount the amount of ETokens to sell.
+     * @return The fee amount.
+     */
     function askFee(uint256 EAmount) external view returns (uint256) {
         if (EAmount == 0) {
             return 0;
@@ -227,9 +287,11 @@ contract EnergyAMM is Ownable {
         return MSwapWithFee - MSwap;
     }
 
-    /// @notice Returns the price of energy when buying.
-    /// @param EAmount The amount of ETokens to buy.
-    /// @return The price of energy.
+    /**
+     * @notice Returns the price of energy when buying.
+     * @param EAmount The amount of ETokens to buy.
+     * @return The price of energy.
+     */
     function bidPrice(uint256 EAmount) external view returns (UD60x18) {
         if (EAmount == 0) {
             return convert(0);
@@ -239,9 +301,11 @@ contract EnergyAMM is Ownable {
         return MSwap.tokToUD(MToken) / ESwap.tokToUD(EToken);
     }
 
-    /// @notice Returns the price of energy when selling.
-    /// @param EAmount The amount of ETokens to sell.
-    /// @return The price of energy.
+    /**
+     * @notice Returns the price of energy when selling.
+     * @param EAmount The amount of ETokens to sell.
+     * @return The price of energy.
+     */
     function askPrice(uint256 EAmount) external view returns (UD60x18) {
         if (EAmount == 0) {
             return convert(0);
@@ -251,53 +315,60 @@ contract EnergyAMM is Ownable {
         return MSwap.tokToUD(MToken) / ESwap.tokToUD(EToken);
     }
 
-    /// @notice Returns the bid-ask spread, which is the difference between the ask price and the
-    /// bid price for a certain amount of energy.
-    /// @param EAmount The amount of ETokens to buy or sell.
-    /// @return The bid-ask spread.
+    /**
+     * @notice Returns the bid-ask spread, which is the difference between the ask price and the bid price for a certain
+     * amount of energy.
+     * @param EAmount The amount of ETokens to buy or sell.
+     * @return The bid-ask spread.
+     */
     function bidAskSpread(uint256 EAmount) external view returns (SD59x18) {
         return this.askPrice(EAmount).intoSD59x18() - this.bidPrice(EAmount).intoSD59x18();
     }
 
-    /// @notice Returns the slippage of a bid, which is the proportional difference between the bid
-    /// price and the pool price.
-    /// @param EAmount The amount of ETokens to buy.
-    /// @return The slippage of the bid.
+    /**
+     * @notice Returns the slippage of a bid, which is the proportional difference between the bid price and the pool
+     * price.
+     * @param EAmount The amount of ETokens to buy.
+     * @return The slippage of the bid.
+     */
     function bidSlippage(uint256 EAmount) external view returns (SD59x18) {
         return (this.bidPrice(EAmount) / this.poolPrice()).intoSD59x18() + convert(1).intoSD59x18();
     }
 
-    /// @notice Returns the slippage of a ask, which is the proportional difference between the ask
-    /// price and the pool price.
-    /// @param EAmount The amount of ETokens to sell.
-    /// @return The slippage of the ask.
+    /**
+     * @notice Returns the slippage of a ask, which is the proportional difference between the ask price and the pool
+     * price.
+     * @param EAmount The amount of ETokens to sell.
+     * @return The slippage of the ask.
+     */
     function askSlippage(uint256 EAmount) external view returns (SD59x18) {
         return (this.askPrice(EAmount) / this.poolPrice()).intoSD59x18() - convert(1).intoSD59x18();
     }
 
-    /// @notice Returns the amount of MTokens and ETokens required to add an specific amount of
-    /// ETokens to the liquidity pool.
-    /// @param EAmount The amount of ETokens to add to the liquidity pool.
-    /// @return MLiq The amount of MTokens required.
-    /// @return ELiq The amount of ETokens required.
-    function liquidityProvision(uint256 EAmount)
-        external view returns (uint256 MLiq, uint256 ELiq) {
-
+    /**
+     * @notice Returns the amount of MTokens and ETokens required to add an specific amount of ETokens to the liquidity
+     * pool.
+     * @param EAmount The amount of ETokens to add to the liquidity pool.
+     * @return MLiq The amount of MTokens required.
+     * @return ELiq The amount of ETokens required.
+     */
+    function liquidityProvision(uint256 EAmount) external view returns (uint256 MLiq, uint256 ELiq) {
         if (EAmount == 0) {
             return (0, 0);
         }
 
-        MLiq = ((this.EReserve() + EAmount).tokToUD(EToken) *
-                    sqrt(poolPriceEquilibrium * poolPriceBoundUpper) *
-                    (sqrt(poolPriceEquilibrium) - sqrt(poolPriceBoundLower)) /
-                    (sqrt(poolPriceBoundUpper) - sqrt(poolPriceEquilibrium)) -
-                    (this.MReserve()).tokToUD(MToken)).UDToTok(MToken);
+        MLiq = ((this.EReserve() + EAmount).tokToUD(EToken) * sqrt(poolPriceEquilibrium * poolPriceBoundUpper)
+                * (sqrt(poolPriceEquilibrium) - sqrt(poolPriceBoundLower))
+                / (sqrt(poolPriceBoundUpper) - sqrt(poolPriceEquilibrium)) - (this.MReserve()).tokToUD(MToken))
+        .UDToTok(MToken);
         ELiq = EAmount;
     }
 
-    /// @notice Adds liquidity to the liquidity pool.
-    /// @param EAmount the amount of ETokens to add to the liquidity pool.
-    /// @return info Information about the liquidity addition.
+    /**
+     * @notice Adds liquidity to the liquidity pool.
+     * @param EAmount the amount of ETokens to add to the liquidity pool.
+     * @return info Information about the liquidity addition.
+     */
     function addLiquidity(uint256 EAmount) external returns (LiquidityAdditionInfo memory info) {
         if (!this.isLiquidityAdditionOpen()) {
             revert OperationClosed();
@@ -305,10 +376,8 @@ contract EnergyAMM is Ownable {
 
         (uint256 MLiq, uint256 ELiq) = this.liquidityProvision(EAmount);
 
-        require(MToken.transferFrom(msg.sender, address(this), MLiq),
-                "Failed to transfer from caller.");
-        require(EToken.transferFrom(msg.sender, address(this), ELiq),
-                "Failed to transfer fram caller.");
+        require(MToken.transferFrom(msg.sender, address(this), MLiq), "Failed to transfer from caller.");
+        require(EToken.transferFrom(msg.sender, address(this), ELiq), "Failed to transfer fram caller.");
 
         bool isRegistered = false;
         for (uint256 iProviders = 0; iProviders < liquidityProviders.length; ++iProviders) {
@@ -330,9 +399,11 @@ contract EnergyAMM is Ownable {
         emit MarketStateChanged();
     }
 
-    /// @notice Buys energy from the market.
-    /// @param EAmount the amount of ETokens to buy.
-    /// @return info Information about the transaction.
+    /**
+     * @notice Buys energy from the market.
+     * @param EAmount the amount of ETokens to buy.
+     * @return info Information about the transaction.
+     */
     function buy(uint256 EAmount) external returns (TransactionInfo memory info) {
         if (!this.isTradingOpen()) {
             revert OperationClosed();
@@ -357,8 +428,7 @@ contract EnergyAMM is Ownable {
         info.transPrice = this.bidPrice(EAmount);
         info.slippage = this.bidSlippage(EAmount);
 
-        require(MToken.transferFrom(msg.sender, address(this), MSwap + MFee),
-                "Failed to transfer MTokens from sender.");
+        require(MToken.transferFrom(msg.sender, address(this), MSwap + MFee), "Failed to transfer MTokens from sender.");
         require(EToken.transfer(msg.sender, ESwap), "Failed to transfer ETokens to sender.");
 
         calculateLiquidity();
@@ -366,9 +436,11 @@ contract EnergyAMM is Ownable {
         emit MarketStateChanged();
     }
 
-    /// @notice Sells energy to the market.
-    /// @param EAmount the amount of ETokens to sell.
-    /// @return info Information about the transaction.
+    /**
+     * @notice Sells energy to the market.
+     * @param EAmount the amount of ETokens to sell.
+     * @return info Information about the transaction.
+     */
     function sell(uint256 EAmount) external returns (TransactionInfo memory info) {
         if (!this.isTradingOpen()) {
             revert OperationClosed();
@@ -394,67 +466,80 @@ contract EnergyAMM is Ownable {
         info.slippage = this.askSlippage(EAmount);
 
         require(MToken.transfer(msg.sender, MSwap - MFee), "Failed to transfer MTokens to sender.");
-        require(EToken.transferFrom(msg.sender, address(this), ESwap),
-                "Failed to transfer ETokens from sender.");
+        require(EToken.transferFrom(msg.sender, address(this), ESwap), "Failed to transfer ETokens from sender.");
 
         calculateLiquidity();
 
         emit MarketStateChanged();
     }
 
-    /// @notice Sets the bounds on the pool price.
-    /// @param lower The lowest possible pool price.
-    /// @param upper The greatest possible pool price.
-    function setPoolPriceBounds(UD60x18 lower, UD60x18 upper) external onlyOwner() {
-        require(!this.isLiquidityAdditionOpen(),
-                "Cannot change the price bounds while the market is open for liquidity addition.");
-        require(!this.isTradingOpen(),
-                "Cannot change the price bounds while the market is open for trading.");
+    /**
+     * @notice Sets the bounds on the pool price.
+     * @param lower The lowest possible pool price.
+     * @param upper The greatest possible pool price.
+     */
+    function setPoolPriceBounds(UD60x18 lower, UD60x18 upper) external onlyOwner {
+        require(
+            !this.isLiquidityAdditionOpen(),
+            "Cannot change the price bounds while the market is open for liquidity addition."
+        );
+        require(!this.isTradingOpen(), "Cannot change the price bounds while the market is open for trading.");
 
         poolPriceBoundLower = lower;
         poolPriceBoundUpper = upper;
-        poolPriceEquilibrium = convert(4) * poolPriceBoundLower * poolPriceBoundUpper /
-            powu((sqrt(poolPriceBoundLower) + sqrt(poolPriceBoundUpper)), 2);
+        poolPriceEquilibrium = convert(4) * poolPriceBoundLower * poolPriceBoundUpper
+            / powu((sqrt(poolPriceBoundLower) + sqrt(poolPriceBoundUpper)), 2);
     }
 
-    /// @notice Sets the fee rate for transactions.
-    /// @param feeRate_ The fee rate.
-    function setFeeRate(UD60x18 feeRate_) external onlyOwner() {
-        require(!this.isTradingOpen(),
-                "Cannot change the fee rate while the market is open for trading.");
+    /**
+     * @notice Sets the fee rate for transactions.
+     * @param feeRate_ The fee rate.
+     */
+    function setFeeRate(UD60x18 feeRate_) external onlyOwner {
+        require(!this.isTradingOpen(), "Cannot change the fee rate while the market is open for trading.");
 
         feeRate = feeRate_;
     }
 
-    /// @notice Opens the market for liquidity addition.
-    function openLiquidityAddition() external onlyOwner() {
+    /**
+     * @notice Opens the market for liquidity addition.
+     */
+    function openLiquidityAddition() external onlyOwner {
         isLiquidityAdditionOpen = true;
         this.closeTrading();
         emit LiquidityAdditionOpened();
     }
 
-    /// @notice Closes the market for liquidity addition.
-    function closeLiquidityAddition() external onlyOwner() {
+    /**
+     * @notice Closes the market for liquidity addition.
+     */
+    function closeLiquidityAddition() external onlyOwner {
         isLiquidityAdditionOpen = false;
         emit LiquidityAdditionClosed();
     }
 
-    /// @notice Opens the market for trading.
-    function openTrading() external onlyOwner() {
+    /**
+     * @notice Opens the market for trading.
+     */
+    function openTrading() external onlyOwner {
         isTradingOpen = true;
         this.closeLiquidityAddition();
         emit TradingOpened();
     }
 
-    /// @notice Closes the market for trading.
-    function closeTrading() external onlyOwner() {
+    /**
+     * @notice Closes the market for trading.
+     */
+    function closeTrading() external onlyOwner {
         isTradingOpen = false;
         emit TradingClosed();
     }
 
-    /// @notice Resolves the market after trading. This involves resetting the liquidity pool and
-    /// reimbursing liquidity providers.
-    function resolveMarket() external onlyOwner() {
+    /**
+     * @notice Resolves the market after trading. This involves resetting the liquidity pool and reimbursing liquidity
+     * providers.
+     */
+    function resolveMarket() external onlyOwner {
         this.closeLiquidityAddition();
         this.closeTrading();
 
@@ -467,16 +552,14 @@ contract EnergyAMM is Ownable {
             uint256 MAmount = (proportion * this.MReserve().tokToUD(MToken)).UDToTok(MToken);
             uint256 EAmount = (proportion * this.EReserve().tokToUD(EToken)).UDToTok(EToken);
 
-            require(MToken.transfer(provider, MAmount),
-                    "Failed to transfer MTokens to liquidity provider.");
-            require(EToken.transfer(provider, EAmount),
-                    "Failed to transfer MTokens to liquidity provider.");
+            require(MToken.transfer(provider, MAmount), "Failed to transfer MTokens to liquidity provider.");
+            require(EToken.transfer(provider, EAmount), "Failed to transfer MTokens to liquidity provider.");
 
             LToken.burn(provider, LAmount);
         }
 
         calculateLiquidity();
-        
+
         emit MarketResolved();
         emit MarketStateChanged();
     }
