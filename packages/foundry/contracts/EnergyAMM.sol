@@ -160,6 +160,15 @@ contract EnergyAMM is Ownable {
     error ReserveExceeded(uint256 _MReserve, uint256 _EReserve, uint256 MSwap, uint256 ESwap);
 
     /**
+     * @notice Thrown if a transaction is attempted without the required allowance of MTokens and/or ETokens.
+     * @param MRequired The required amount of MTokens.
+     * @param ERequired The required amount of ETokens.
+     * @param MAllowance The amount of MTokens given by the caller.
+     * @param EAllowance The amount of ETokens given by the caller.
+     */
+    error InsufficientAllowance(uint256 MRequired, uint256 ERequired, uint256 MAllowance, uint256 EAllowance);
+
+    /**
      * @notice Thrown if a operation is attempted while the operation is closed, such as trading when the market is
      * closed to trading.
      */
@@ -376,8 +385,14 @@ contract EnergyAMM is Ownable {
 
         (uint256 MLiq, uint256 ELiq) = this.liquidityProvision(EAmount);
 
-        require(MToken.transferFrom(msg.sender, address(this), MLiq), "Failed to transfer from caller.");
-        require(EToken.transferFrom(msg.sender, address(this), ELiq), "Failed to transfer fram caller.");
+        uint256 MAllowance = MToken.allowance(msg.sender, address(this));
+        uint256 EAllowance = EToken.allowance(msg.sender, address(this));
+        if (MAllowance < MLiq || EAllowance < ELiq) {
+            revert InsufficientAllowance(MLiq, ELiq, MAllowance, EAllowance);
+        } else {
+            require(MToken.transferFrom(msg.sender, address(this), MLiq));
+            require(EToken.transferFrom(msg.sender, address(this), ELiq));
+        }
 
         bool isRegistered = false;
         for (uint256 iProviders = 0; iProviders < liquidityProviders.length; ++iProviders) {
@@ -428,8 +443,14 @@ contract EnergyAMM is Ownable {
         info.transPrice = this.bidPrice(EAmount);
         info.slippage = this.bidSlippage(EAmount);
 
-        require(MToken.transferFrom(msg.sender, address(this), MSwap + MFee), "Failed to transfer MTokens from sender.");
-        require(EToken.transfer(msg.sender, ESwap), "Failed to transfer ETokens to sender.");
+        uint256 MAllowance = MToken.allowance(msg.sender, address(this));
+        uint256 EAllowance = EToken.allowance(msg.sender, address(this));
+        if (MAllowance < MSwap + MFee) {
+            revert InsufficientAllowance(MSwap + MFee, 0, MAllowance, EAllowance);
+        } else {
+            require(MToken.transferFrom(msg.sender, address(this), MSwap + MFee));
+            require(EToken.transfer(msg.sender, ESwap));
+        }
 
         calculateLiquidity();
 
@@ -465,8 +486,14 @@ contract EnergyAMM is Ownable {
         info.transPrice = this.askPrice(EAmount);
         info.slippage = this.askSlippage(EAmount);
 
-        require(MToken.transfer(msg.sender, MSwap - MFee), "Failed to transfer MTokens to sender.");
-        require(EToken.transferFrom(msg.sender, address(this), ESwap), "Failed to transfer ETokens from sender.");
+        uint256 MAllowance = MToken.allowance(msg.sender, address(this));
+        uint256 EAllowance = EToken.allowance(msg.sender, address(this));
+        if (EAllowance < ESwap) {
+            revert InsufficientAllowance(0, ESwap, MAllowance, EAllowance);
+        } else {
+            require(MToken.transfer(msg.sender, MSwap - MFee));
+            require(EToken.transferFrom(msg.sender, address(this), ESwap));
+        }
 
         calculateLiquidity();
 
@@ -479,11 +506,9 @@ contract EnergyAMM is Ownable {
      * @param upper The greatest possible pool price.
      */
     function setPoolPriceBounds(UD60x18 lower, UD60x18 upper) external onlyOwner {
-        require(
-            !this.isLiquidityAdditionOpen(),
-            "Cannot change the price bounds while the market is open for liquidity addition."
-        );
-        require(!this.isTradingOpen(), "Cannot change the price bounds while the market is open for trading.");
+        if (this.isLiquidityAdditionOpen() || this.isTradingOpen()) {
+            revert OperationClosed();
+        }
 
         poolPriceBoundLower = lower;
         poolPriceBoundUpper = upper;
@@ -496,8 +521,9 @@ contract EnergyAMM is Ownable {
      * @param feeRate_ The fee rate.
      */
     function setFeeRate(UD60x18 feeRate_) external onlyOwner {
-        require(!this.isTradingOpen(), "Cannot change the fee rate while the market is open for trading.");
-
+        if (this.isLiquidityAdditionOpen() || this.isTradingOpen()) {
+            revert OperationClosed();
+        }
         feeRate = feeRate_;
     }
 
@@ -552,8 +578,8 @@ contract EnergyAMM is Ownable {
             uint256 MAmount = (proportion * this.MReserve().tokToUD(MToken)).UDToTok(MToken);
             uint256 EAmount = (proportion * this.EReserve().tokToUD(EToken)).UDToTok(EToken);
 
-            require(MToken.transfer(provider, MAmount), "Failed to transfer MTokens to liquidity provider.");
-            require(EToken.transfer(provider, EAmount), "Failed to transfer ETokens to liquidity provider.");
+            require(MToken.transfer(provider, MAmount));
+            require(EToken.transfer(provider, EAmount));
 
             LToken.burn(provider, LAmount);
         }
