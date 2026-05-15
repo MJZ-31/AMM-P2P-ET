@@ -532,7 +532,7 @@ contract EnergyAMM is Ownable {
      */
     function openLiquidityAddition() external onlyOwner {
         isLiquidityAdditionOpen = true;
-        this.closeTrading();
+        isTradingOpen = false;
         emit LiquidityAdditionOpened();
     }
 
@@ -548,8 +548,8 @@ contract EnergyAMM is Ownable {
      * @notice Opens the market for trading.
      */
     function openTrading() external onlyOwner {
+        isLiquidityAdditionOpen = false;
         isTradingOpen = true;
-        this.closeLiquidityAddition();
         emit TradingOpened();
     }
 
