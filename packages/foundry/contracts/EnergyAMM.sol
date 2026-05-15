@@ -144,6 +144,13 @@ contract EnergyAMM is Ownable {
     event MarketResolved();
 
     /**
+     * @notice Thrown if a liquidity addition is attempted with a token quantity of zero.
+     * @param MLiq The amount of MTokens in the attempted liquidity addition.
+     * @param ELiq The amount of ETokens in the attempted liquidity addition.
+     */
+    error ZeroProvision(uint256 MLiq, uint256 ELiq);
+
+    /**
      * @notice Thrown if a swap is attempted with a token quantity of zero.
      * @param MSwap The amount of MTokens in the attempted swap.
      * @param ESwap The amount of ETokens in the attempted swap.
@@ -384,6 +391,9 @@ contract EnergyAMM is Ownable {
         }
 
         (uint256 MLiq, uint256 ELiq) = this.liquidityProvision(EAmount);
+        if (MLiq == 0 || ELiq == 0) {
+            revert ZeroProvision(MLiq, ELiq);
+        }
 
         uint256 MAllowance = MToken.allowance(msg.sender, address(this));
         uint256 EAllowance = EToken.allowance(msg.sender, address(this));
