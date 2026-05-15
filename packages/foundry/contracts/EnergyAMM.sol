@@ -242,14 +242,17 @@ contract EnergyAMM is Ownable {
      * @return ESwap The amount of ETokens that will be transfered from the liquidity pool to the user.
      */
     function bidSwap(uint256 EAmount) external view returns (uint256 MSwap, uint256 ESwap) {
-        if (EAmount == 0) {
-            return (0, 0);
-        }
-
         MSwap = (powu(liquidity, 2) / (this.EReserve() + EVirtual - EAmount).tokToUD(EToken)
                 - (this.MReserve() + MVirtual).tokToUD(MToken))
         .UDToTok(MToken);
         ESwap = EAmount;
+
+        if (MSwap == 0) {
+            ESwap = 0;
+        }
+        if (ESwap == 0) {
+            MSwap = 0;
+        }
     }
 
     /**
@@ -259,14 +262,17 @@ contract EnergyAMM is Ownable {
      * @return ESwap The amount of ETokens that will be transfered from the user to the liquidity pool.
      */
     function askSwap(uint256 EAmount) external view returns (uint256 MSwap, uint256 ESwap) {
-        if (EAmount == 0) {
-            return (0, 0);
-        }
-
         MSwap = ((this.MReserve() + MVirtual).tokToUD(MToken) - powu(liquidity, 2)
                 / (this.EReserve() + EVirtual + EAmount).tokToUD(EToken))
         .UDToTok(MToken);
         ESwap = EAmount;
+
+        if (MSwap == 0) {
+            ESwap = 0;
+        }
+        if (ESwap == 0) {
+            MSwap = 0;
+        }
     }
 
     /**
