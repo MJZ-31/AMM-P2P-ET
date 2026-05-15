@@ -553,7 +553,7 @@ contract EnergyAMM is Ownable {
             uint256 EAmount = (proportion * this.EReserve().tokToUD(EToken)).UDToTok(EToken);
 
             require(MToken.transfer(provider, MAmount), "Failed to transfer MTokens to liquidity provider.");
-            require(EToken.transfer(provider, EAmount), "Failed to transfer MTokens to liquidity provider.");
+            require(EToken.transfer(provider, EAmount), "Failed to transfer ETokens to liquidity provider.");
 
             LToken.burn(provider, LAmount);
         }
