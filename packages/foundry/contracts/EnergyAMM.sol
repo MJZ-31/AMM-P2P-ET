@@ -416,7 +416,7 @@ contract EnergyAMM is Ownable {
             revert ZeroSwap(MSwap, ESwap);
         }
         if (ESwap > this.EReserve()) {
-            revert ReserveExceeded(0, 0, 0, 0);
+            revert ReserveExceeded(this.MReserve(), this.EReserve(), MSwap, ESwap);
         }
 
         info.trader = msg.sender;
