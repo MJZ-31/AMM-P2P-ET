@@ -37,7 +37,7 @@ contract EnergyAMMTest is Test {
         vm.stopPrank();
     }
 
-    function test_MReserve(uint256 EAmount) public {
+    function testFuzz_MReserve(uint256 EAmount) public {
         vm.startPrank(owner);
         AMM.setPoolPriceBounds(ud(0.5e18), convert(2));
         AMM.openLiquidityAddition();
