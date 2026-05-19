@@ -259,7 +259,8 @@ contract EnergyAMM is Ownable {
      */
     function askRange() external view returns (uint256 EMin, uint256 EMax) {
         EMin = 0;
-        EMax = (powu(liquidity, 2) / MVirtual.tokToUD(MToken) - EVirtual.tokToUD(EToken)).UDToTok(EToken) - this.EReserve();
+        EMax = (powu(liquidity, 2) / MVirtual.tokToUD(MToken) - EVirtual.tokToUD(EToken)).UDToTok(EToken)
+            - this.EReserve();
     }
 
     /**
