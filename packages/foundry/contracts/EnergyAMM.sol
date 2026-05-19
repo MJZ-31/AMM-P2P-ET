@@ -57,13 +57,20 @@ error ZeroProvision(uint256 MLiq, uint256 ELiq);
 error ZeroSwap(uint256 MSwap, uint256 ESwap);
 
 /**
- * @notice Thrown if a swap attempts to remove more reserve tokens than are available.
- * @param _MReserve The amount of MTokens in reserve.
- * @param _EReserve The amount of ETokens in reserve.
- * @param MSwap The amount of MTokens to be removed in the attempted swap.
- * @param ESwap The amount of ETokens to be removed in the attempted swap.
+ * @notice Thrown if bid is attempted for an amount of ETokens outside of the allowable range.
+ * @param EMin The minimum amount of ETokens for a bid.
+ * @param EMin The maximum amount of ETokens for a bid.
+ * @param EAmount The amount of ETokens made in the bid.
  */
-error ReserveExceeded(uint256 _MReserve, uint256 _EReserve, uint256 MSwap, uint256 ESwap);
+error BidOutsideRange(uint256 EMin, uint256 EMax, uint256 EAmount);
+
+/**
+ * @notice Thrown if ask is attempted for an amount of ETokens outside of the allowable range.
+ * @param EMin The minimum amount of ETokens for a ask.
+ * @param EMin The maximum amount of ETokens for a ask.
+ * @param EAmount The amount of ETokens made in the ask.
+ */
+error AskOutsideRange(uint256 EMin, uint256 EMax, uint256 EAmount);
 
 /**
  * @notice Thrown if a transaction is attempted without the required allowance of MTokens and/or ETokens.
@@ -79,8 +86,6 @@ error InsufficientAllowance(uint256 MRequired, uint256 ERequired, uint256 MAllow
  * closed to trading.
  */
 error OperationClosed();
-
-
 
 /**
  * @title EnergyAMM: An Automated Market Maker (AMM) for the trading of energy.
@@ -238,12 +243,37 @@ contract EnergyAMM is Ownable {
     }
 
     /**
+     * @notice Returns the range of valid amount of ETokens for a bid.
+     * @return EMin The minimum amount of ETokens.
+     * @return EMax The maximum amount of ETokens.
+     */
+    function bidRange() external view returns (uint256 EMin, uint256 EMax) {
+        EMin = 0;
+        EMax = (this.EReserve().tokToUD(EToken) - convert(1)).UDToTok(EToken);
+    }
+
+    /**
+     * @notice Returns the range of valid amount of ETokens for an ask.
+     * @return EMin The minimum amount of ETokens.
+     * @return EMax The maximum amount of ETokens.
+     */
+    function askRange() external view returns (uint256 EMin, uint256 EMax) {
+        EMin = 0;
+        EMax = (powu(liquidity, 2) / MVirtual.tokToUD(MToken) - EVirtual.tokToUD(EToken)).UDToTok(EToken) - this.EReserve();
+    }
+
+    /**
      * @notice Returns the swap amounts for buying ETokens, before fees are applied.
      * @param EAmount The amount of ETokens to buy.
      * @return MSwap The amount of MTokens that will be transfered from the user to the liquidity pool.
      * @return ESwap The amount of ETokens that will be transfered from the liquidity pool to the user.
      */
     function bidSwap(uint256 EAmount) external view returns (uint256 MSwap, uint256 ESwap) {
+        (uint256 EMin, uint256 EMax) = this.bidRange();
+        if (EAmount <= EMin || EAmount >= EMax) {
+            revert BidOutsideRange(EMin, EMax, EAmount);
+        }
+
         MSwap = (powu(liquidity, 2) / (this.EReserve() + EVirtual - EAmount).tokToUD(EToken)
                 - (this.MReserve() + MVirtual).tokToUD(MToken))
         .UDToTok(MToken);
@@ -264,6 +294,11 @@ contract EnergyAMM is Ownable {
      * @return ESwap The amount of ETokens that will be transfered from the user to the liquidity pool.
      */
     function askSwap(uint256 EAmount) external view returns (uint256 MSwap, uint256 ESwap) {
+        (uint256 EMin, uint256 EMax) = this.askRange();
+        if (EAmount <= EMin || EAmount >= EMax) {
+            revert AskOutsideRange(EMin, EMax, EAmount);
+        }
+
         MSwap = ((this.MReserve() + MVirtual).tokToUD(MToken) - powu(liquidity, 2)
                 / (this.EReserve() + EVirtual + EAmount).tokToUD(EToken))
         .UDToTok(MToken);
@@ -448,9 +483,6 @@ contract EnergyAMM is Ownable {
         if (MSwap == 0 || ESwap == 0) {
             revert ZeroSwap(MSwap, ESwap);
         }
-        if (ESwap > this.EReserve()) {
-            revert ReserveExceeded(this.MReserve(), this.EReserve(), MSwap, ESwap);
-        }
 
         info.trader = msg.sender;
         info.transType = "buy";
@@ -490,9 +522,6 @@ contract EnergyAMM is Ownable {
 
         if (MSwap == 0 || ESwap == 0) {
             revert ZeroSwap(MSwap, ESwap);
-        }
-        if (MSwap > this.MReserve()) {
-            revert ReserveExceeded(this.MReserve(), this.EReserve(), MSwap, ESwap);
         }
 
         info.trader = msg.sender;
