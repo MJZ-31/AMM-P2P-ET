@@ -13,6 +13,76 @@ using { tokToUD } for uint256;
 using { UDToTok } for UD60x18;
 
 /**
+ * @notice Emitted when the market state changes, either after a liquidity addition or transaction.
+ */
+event MarketStateChanged();
+
+/**
+ * @notice Emitted when the market is opened for liquidity addition.
+ */
+event LiquidityAdditionOpened();
+
+/**
+ * @notice Emitted when the market is closed for liquidity addition.
+ */
+event LiquidityAdditionClosed();
+
+/**
+ * @notice Emitted when the market is opened for trading.
+ */
+event TradingOpened();
+
+/**
+ * @notice Emitted when the market is closed for trading.
+ */
+event TradingClosed();
+
+/**
+ * @notice Emitted when the market is resolved.
+ */
+event MarketResolved();
+
+/**
+ * @notice Thrown if a liquidity addition is attempted with a token quantity of zero.
+ * @param MLiq The amount of MTokens in the attempted liquidity addition.
+ * @param ELiq The amount of ETokens in the attempted liquidity addition.
+ */
+error ZeroProvision(uint256 MLiq, uint256 ELiq);
+
+/**
+ * @notice Thrown if a swap is attempted with a token quantity of zero.
+ * @param MSwap The amount of MTokens in the attempted swap.
+ * @param ESwap The amount of ETokens in the attempted swap.
+ */
+error ZeroSwap(uint256 MSwap, uint256 ESwap);
+
+/**
+ * @notice Thrown if a swap attempts to remove more reserve tokens than are available.
+ * @param _MReserve The amount of MTokens in reserve.
+ * @param _EReserve The amount of ETokens in reserve.
+ * @param MSwap The amount of MTokens to be removed in the attempted swap.
+ * @param ESwap The amount of ETokens to be removed in the attempted swap.
+ */
+error ReserveExceeded(uint256 _MReserve, uint256 _EReserve, uint256 MSwap, uint256 ESwap);
+
+/**
+ * @notice Thrown if a transaction is attempted without the required allowance of MTokens and/or ETokens.
+ * @param MRequired The required amount of MTokens.
+ * @param ERequired The required amount of ETokens.
+ * @param MAllowance The amount of MTokens given by the caller.
+ * @param EAllowance The amount of ETokens given by the caller.
+ */
+error InsufficientAllowance(uint256 MRequired, uint256 ERequired, uint256 MAllowance, uint256 EAllowance);
+
+/**
+ * @notice Thrown if a operation is attempted while the operation is closed, such as trading when the market is
+ * closed to trading.
+ */
+error OperationClosed();
+
+
+
+/**
  * @title EnergyAMM: An Automated Market Maker (AMM) for the trading of energy.
  * @author Mitchel Justinen
  * @notice This contract is responsible for maintaining a liquidity pool containing reserves of tokens representing
@@ -112,74 +182,6 @@ contract EnergyAMM is Ownable {
      * @notice Whether or not the market is open for trading.
      */
     bool public isTradingOpen;
-
-    /**
-     * @notice Emitted when the market state changes, either after a liquidity addition or transaction.
-     */
-    event MarketStateChanged();
-
-    /**
-     * @notice Emitted when the market is opened for liquidity addition.
-     */
-    event LiquidityAdditionOpened();
-
-    /**
-     * @notice Emitted when the market is closed for liquidity addition.
-     */
-    event LiquidityAdditionClosed();
-
-    /**
-     * @notice Emitted when the market is opened for trading.
-     */
-    event TradingOpened();
-
-    /**
-     * @notice Emitted when the market is closed for trading.
-     */
-    event TradingClosed();
-
-    /**
-     * @notice Emitted when the market is resolved.
-     */
-    event MarketResolved();
-
-    /**
-     * @notice Thrown if a liquidity addition is attempted with a token quantity of zero.
-     * @param MLiq The amount of MTokens in the attempted liquidity addition.
-     * @param ELiq The amount of ETokens in the attempted liquidity addition.
-     */
-    error ZeroProvision(uint256 MLiq, uint256 ELiq);
-
-    /**
-     * @notice Thrown if a swap is attempted with a token quantity of zero.
-     * @param MSwap The amount of MTokens in the attempted swap.
-     * @param ESwap The amount of ETokens in the attempted swap.
-     */
-    error ZeroSwap(uint256 MSwap, uint256 ESwap);
-
-    /**
-     * @notice Thrown if a swap attempts to remove more reserve tokens than are available.
-     * @param _MReserve The amount of MTokens in reserve.
-     * @param _EReserve The amount of ETokens in reserve.
-     * @param MSwap The amount of MTokens to be removed in the attempted swap.
-     * @param ESwap The amount of ETokens to be removed in the attempted swap.
-     */
-    error ReserveExceeded(uint256 _MReserve, uint256 _EReserve, uint256 MSwap, uint256 ESwap);
-
-    /**
-     * @notice Thrown if a transaction is attempted without the required allowance of MTokens and/or ETokens.
-     * @param MRequired The required amount of MTokens.
-     * @param ERequired The required amount of ETokens.
-     * @param MAllowance The amount of MTokens given by the caller.
-     * @param EAllowance The amount of ETokens given by the caller.
-     */
-    error InsufficientAllowance(uint256 MRequired, uint256 ERequired, uint256 MAllowance, uint256 EAllowance);
-
-    /**
-     * @notice Thrown if a operation is attempted while the operation is closed, such as trading when the market is
-     * closed to trading.
-     */
-    error OperationClosed();
 
     /**
      * @notice Creates a new EnergyAMM contract for trading the given MToken and EToken. The liquidity pool will be
