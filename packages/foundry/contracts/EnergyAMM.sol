@@ -72,6 +72,15 @@ error BidOutsideRange(uint256 EMin, uint256 EMax, uint256 EAmount);
  */
 error AskOutsideRange(uint256 EMin, uint256 EMax, uint256 EAmount);
 
+
+/**
+ * @notice Thrown if the pool price bounds are set to an invalid range. For example, if the lower bound is greater than
+ * the upper bound.
+ * @param lower The lower bound of the pool price.
+ * @param upper The lower bound of the pool price.
+ */
+error InvalidPoolPriceBounds(UD60x18 lower, UD60x18 upper);
+
 /**
  * @notice Thrown if a transaction is attempted without the required allowance of MTokens and/or ETokens.
  * @param MRequired The required amount of MTokens.
@@ -554,6 +563,9 @@ contract EnergyAMM is Ownable {
     function setPoolPriceBounds(UD60x18 lower, UD60x18 upper) external onlyOwner {
         if (this.isLiquidityAdditionOpen() || this.isTradingOpen()) {
             revert OperationClosed();
+        }
+        if (lower >= upper) {
+            revert InvalidPoolPriceBounds(lower, upper);
         }
 
         poolPriceBoundLower = lower;
