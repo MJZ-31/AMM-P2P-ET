@@ -12,7 +12,7 @@ import { UD60x18, powu, sqrt, ud } from "@prb/math/src/UD60x18.sol";
  */
 function tokToUD(uint256 self, IERC20Metadata token) view returns (UD60x18) {
     uint8 decimals = token.decimals();
-    if (decimals < 18) {
+    if (decimals >= 18) {
         return ud(self / (10 ** (decimals - 18)));
     } else {
         return ud(self * (10 ** (18 - decimals)));
@@ -28,7 +28,7 @@ function tokToUD(uint256 self, IERC20Metadata token) view returns (UD60x18) {
  */
 function UDToTok(UD60x18 self, IERC20Metadata token) view returns (uint256) {
     uint8 decimals = token.decimals();
-    if (decimals < 18) {
+    if (decimals >= 18) {
         return self.unwrap() * (10 ** (decimals - 18));
     } else {
         return self.unwrap() / (10 ** (18 - decimals));
