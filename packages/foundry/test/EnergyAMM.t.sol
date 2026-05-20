@@ -184,7 +184,7 @@ contract EnergyAMMTest is Test {
         }
     }
 
-    function testFuzz_bidSwapOutSideRange(uint256 EAmount, UD60x18 poolPriceLowerBound, UD60x18 poolPriceUpperBound)
+    function testFuzz_bidSwapOutsideRange(uint256 EAmount, UD60x18 poolPriceLowerBound, UD60x18 poolPriceUpperBound)
         public
     {
         vm.startPrank(owner);
@@ -253,7 +253,7 @@ contract EnergyAMMTest is Test {
         }
     }
 
-    function testFuzz_askSwapOutSideRange(uint256 EAmount, UD60x18 poolPriceLowerBound, UD60x18 poolPriceUpperBound)
+    function testFuzz_askSwapOutsideRange(uint256 EAmount, UD60x18 poolPriceLowerBound, UD60x18 poolPriceUpperBound)
         public
     {
         vm.startPrank(owner);
