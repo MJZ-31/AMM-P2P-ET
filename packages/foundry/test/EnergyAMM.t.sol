@@ -147,7 +147,7 @@ contract EnergyAMMTest is Test {
         assert(AMM.poolPrice() <= AMM.poolPriceBoundUpper());
     }
 
-    function testFuzz_bidSwap(uint256 EAmount, UD60x18 poolPriceLowerBound, UD60x18 poolPriceUpperBound) public {
+    function testFuzz_bidSwap(uint256 EAmount, UD60x18 poolPriceLowerBound, UD60x18 poolPriceUpperBound) public {       
         vm.startPrank(owner);
         vm.assumeNoRevert();
         AMM.setPoolPriceBounds(poolPriceLowerBound, poolPriceUpperBound);
@@ -283,5 +283,75 @@ contract EnergyAMMTest is Test {
         vm.expectRevert(abi.encodeWithSelector(AskOutsideRange.selector, EMin, EMax, EAmount), address(AMM), 1);
         AMM.askSwap(EAmount);
         vm.stopPrank();
+    }
+
+    function testFuzz_bidFee(uint256 EAmount, UD60x18 feeRate, UD60x18 poolPriceLowerBound, UD60x18 poolPriceUpperBound)
+        public
+    {
+        vm.startPrank(owner);
+        vm.assumeNoRevert();
+        AMM.setPoolPriceBounds(poolPriceLowerBound, poolPriceUpperBound);
+        AMM.setFeeRate(feeRate);
+        AMM.openLiquidityAddition();
+        vm.stopPrank();
+
+        vm.startPrank(liquidityProvider);
+        vm.assumeNoRevert();
+        (uint256 MLiq, uint256 ELiq) = AMM.liquidityProvision(10 ** 21);
+
+        vm.assumeNoRevert();
+        MToken.approve(address(AMM), MLiq);
+
+        vm.assumeNoRevert();
+        EToken.approve(address(AMM), ELiq);
+
+        vm.assumeNoRevert();
+        AMM.addLiquidity(ELiq);
+        vm.stopPrank();
+
+        vm.startPrank(trader);
+        vm.assumeNoRevert();
+        (uint256 MSwap,) = AMM.bidSwap(EAmount);
+        vm.assumeNoRevert();
+        uint256 MFee = AMM.bidFee(EAmount);
+        vm.stopPrank();
+
+        assertEq(MFee, (MSwap.tokToUD(MToken) * feeRate).UDToTok(MToken));
+    }
+
+    function testFuzz_askFee(uint256 EAmount, UD60x18 feeRate, UD60x18 poolPriceLowerBound, UD60x18 poolPriceUpperBound)
+        public
+    {
+        vm.startPrank(owner);
+        vm.assumeNoRevert();
+        AMM.setPoolPriceBounds(poolPriceLowerBound, poolPriceUpperBound);
+        AMM.setFeeRate(feeRate);
+        AMM.openLiquidityAddition();
+        vm.stopPrank();
+
+        vm.startPrank(liquidityProvider);
+        vm.assumeNoRevert();
+        (uint256 MLiq, uint256 ELiq) = AMM.liquidityProvision(10 ** 21);
+
+        vm.assumeNoRevert();
+        MToken.approve(address(AMM), MLiq);
+
+        vm.assumeNoRevert();
+        EToken.approve(address(AMM), ELiq);
+
+        vm.assumeNoRevert();
+        AMM.addLiquidity(ELiq);
+        vm.stopPrank();
+
+        vm.startPrank(trader);
+        vm.assumeNoRevert();
+        (uint256 MSwap,) = AMM.askSwap(EAmount);
+        vm.assumeNoRevert();
+        uint256 MFee = AMM.askFee(EAmount);
+        vm.stopPrank();
+
+        (uint256 MSwapWithoutFee,) = AMM.askSwap((EAmount.tokToUD(EToken) * (convert(1) - feeRate)).UDToTok(EToken));
+
+        assertEq(MSwap - MFee, MSwapWithoutFee);
     }
 }
