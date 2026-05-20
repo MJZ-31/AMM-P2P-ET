@@ -338,13 +338,11 @@ contract EnergyAMM is Ownable {
             return 0;
         }
 
-        (uint256 MSwap, uint256 ESwap) = this.askSwap(EAmount);
+        (uint256 MSwap,) = this.askSwap(EAmount);
 
-        uint256 EAmountWithFee = (ESwap.tokToUD(EToken) / (convert(1) - feeRate)).UDToTok(EToken);
+        (uint256 MSwapWithoutFee,) = this.askSwap((EAmount.tokToUD(EToken) * (convert(1) - feeRate)).UDToTok(EToken));
 
-        (uint256 MSwapWithFee,) = this.askSwap(EAmountWithFee);
-
-        return MSwapWithFee - MSwap;
+        return MSwap - MSwapWithoutFee;
     }
 
     /**
