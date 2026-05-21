@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 import { Test } from "forge-std/Test.sol";
 import { UD60x18, convert, powu, sqrt, ud } from "@prb/math/src/UD60x18.sol";
+import { SD59x18 } from "@prb/math/src/SD59x18.sol";
 
 import { tokToUD, UDToTok } from "../contracts/Conversions.sol";
 import { ERC20Ownable } from "../contracts/ERC20Ownable.sol";
@@ -184,5 +185,44 @@ contract EnergyAMMTest is Test {
         (uint256 MSwapWithoutFee,) = AMM.askSwap((EAmount.tokToUD(EToken) * (convert(1) - AMM.feeRate())).UDToTok(EToken));
 
         assertEq(MSwap - MFee, MSwapWithoutFee);
+    }
+
+    function testFuzz_bidPrice(uint256 EAmount) public {
+        (uint256 EMin, uint256 EMax) = AMM.bidRange();
+        EAmount = EAmount % (EMax - EMin) + EMin;
+
+        (uint256 MSwap, uint256 ESwap) = AMM.bidSwap(EAmount);
+        UD60x18 price = AMM.bidPrice(EAmount);
+
+        if (MSwap.tokToUD(MToken) == ud(0) || ESwap.tokToUD(EToken) == ud(0)) {
+            assertEqDecimal(price.unwrap(), 0, 18);
+        } else {
+            assertEqDecimal(price.unwrap(), (MSwap.tokToUD(MToken) / ESwap.tokToUD(EToken)).unwrap(), 18);
+        }
+    }
+
+    function testFuzz_askPrice(uint256 EAmount) public {
+        (uint256 EMin, uint256 EMax) = AMM.askRange();
+        EAmount = EAmount % (EMax - EMin) + EMin;
+
+        (uint256 MSwap, uint256 ESwap) = AMM.askSwap(EAmount);
+        UD60x18 price = AMM.askPrice(EAmount);
+
+        if (MSwap.tokToUD(MToken) == ud(0) || ESwap.tokToUD(EToken) == ud(0)) {
+            assertEqDecimal(price.unwrap(), 0, 18);
+        } else {
+            assertEqDecimal(price.unwrap(), (MSwap.tokToUD(MToken) / ESwap.tokToUD(EToken)).unwrap(), 18);
+        }
+    }
+
+    function testFuzz_bidAskSpread(uint256 EAmount) public {
+        (uint256 EMin, uint256 EMax) = AMM.askRange();
+        EAmount = EAmount % (EMax - EMin) + EMin;
+
+        UD60x18 bidPrice = AMM.bidPrice(EAmount);
+        UD60x18 askPrice = AMM.askPrice(EAmount);
+        SD59x18 bidAskSpread = AMM.bidAskSpread(EAmount);
+
+        assertEqDecimal(bidAskSpread.unwrap(), (askPrice.intoSD59x18() - bidPrice.intoSD59x18()).unwrap(), 18);
     }
 }
