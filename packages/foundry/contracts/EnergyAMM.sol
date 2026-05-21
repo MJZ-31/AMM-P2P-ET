@@ -258,7 +258,7 @@ contract EnergyAMM is Ownable {
      */
     function bidRange() external view returns (uint256 EMin, uint256 EMax) {
         EMin = 0;
-        EMax = (this.EReserve().tokToUD(EToken) - convert(1)).UDToTok(EToken);
+        EMax = this.EReserve();
     }
 
     /**
@@ -268,8 +268,7 @@ contract EnergyAMM is Ownable {
      */
     function askRange() external view returns (uint256 EMin, uint256 EMax) {
         EMin = 0;
-        EMax = (powu(liquidity, 2) / MVirtual.tokToUD(MToken) - EVirtual.tokToUD(EToken)).UDToTok(EToken)
-            - this.EReserve();
+        EMax = (powu(liquidity, 2) / MVirtual.tokToUD(MToken) - (this.EReserve() + EVirtual).tokToUD(EToken)).UDToTok(EToken);
     }
 
     /**
@@ -280,14 +279,24 @@ contract EnergyAMM is Ownable {
      */
     function bidSwap(uint256 EAmount) external view returns (uint256 MSwap, uint256 ESwap) {
         (uint256 EMin, uint256 EMax) = this.bidRange();
-        if (EAmount <= EMin || EAmount >= EMax) {
+        if (EAmount < EMin || EAmount > EMax) {
             revert BidOutsideRange(EMin, EMax, EAmount);
         }
 
-        MSwap = (powu(liquidity, 2) / (this.EReserve() + EVirtual - EAmount).tokToUD(EToken)
-                - (this.MReserve() + MVirtual).tokToUD(MToken))
-        .UDToTok(MToken);
-        ESwap = EAmount;
+        uint256 EReserveNew = this.EReserve() + EVirtual - EAmount;
+        uint256 MReserveNew = (powu(liquidity, 2) / (EReserveNew).tokToUD(EToken)).UDToTok(MToken);
+
+        if ((this.MReserve() + MVirtual) > MReserveNew) {
+            MSwap = 0;
+        } else {
+            MSwap = MReserveNew - (this.MReserve() + MVirtual);
+        }
+
+        if (EReserveNew > (this.EReserve() + EVirtual)) {
+            ESwap = 0;
+        } else {
+            ESwap = (this.EReserve() + EVirtual) - EReserveNew;
+        }
 
         if (MSwap == 0) {
             ESwap = 0;
@@ -305,14 +314,24 @@ contract EnergyAMM is Ownable {
      */
     function askSwap(uint256 EAmount) external view returns (uint256 MSwap, uint256 ESwap) {
         (uint256 EMin, uint256 EMax) = this.askRange();
-        if (EAmount <= EMin || EAmount >= EMax) {
+        if (EAmount < EMin || EAmount > EMax) {
             revert AskOutsideRange(EMin, EMax, EAmount);
         }
 
-        MSwap = ((this.MReserve() + MVirtual).tokToUD(MToken) - powu(liquidity, 2)
-                / (this.EReserve() + EVirtual + EAmount).tokToUD(EToken))
-        .UDToTok(MToken);
-        ESwap = EAmount;
+        uint256 EReserveNew = this.EReserve() + EVirtual + EAmount;
+        uint256 MReserveNew = (powu(liquidity, 2) / EReserveNew.tokToUD(EToken)).UDToTok(MToken);
+
+        if (MReserveNew > (this.MReserve() + MVirtual)) {
+            MSwap = 0;
+        } else {
+            MSwap = (this.MReserve() + MVirtual) - MReserveNew;
+        }
+
+        if ((this.EReserve() + EVirtual) > EReserveNew) {
+            ESwap = 0;
+        } else {
+            ESwap = EReserveNew - (this.EReserve() + EVirtual);
+        }
 
         if (MSwap == 0) {
             ESwap = 0;
@@ -328,10 +347,6 @@ contract EnergyAMM is Ownable {
      * @return The fee amount.
      */
     function bidFee(uint256 EAmount) external view returns (uint256) {
-        if (EAmount == 0) {
-            return 0;
-        }
-
         (uint256 MSwap,) = this.bidSwap(EAmount);
 
         return (MSwap.tokToUD(MToken) * feeRate).UDToTok(MToken);
@@ -343,10 +358,6 @@ contract EnergyAMM is Ownable {
      * @return The fee amount.
      */
     function askFee(uint256 EAmount) external view returns (uint256) {
-        if (EAmount == 0) {
-            return 0;
-        }
-
         (uint256 MSwap,) = this.askSwap(EAmount);
 
         (uint256 MSwapWithoutFee,) = this.askSwap((EAmount.tokToUD(EToken) * (convert(1) - feeRate)).UDToTok(EToken));
