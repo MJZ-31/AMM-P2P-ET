@@ -182,7 +182,8 @@ contract EnergyAMMTest is Test {
         (uint256 MSwap,) = AMM.askSwap(EAmount);
         uint256 MFee = AMM.askFee(EAmount);
 
-        (uint256 MSwapWithoutFee,) = AMM.askSwap((EAmount.tokToUD(EToken) * (convert(1) - AMM.feeRate())).UDToTok(EToken));
+        (uint256 MSwapWithoutFee,) =
+            AMM.askSwap((EAmount.tokToUD(EToken) * (convert(1) - AMM.feeRate())).UDToTok(EToken));
 
         assertEq(MSwap - MFee, MSwapWithoutFee);
     }
@@ -216,13 +217,39 @@ contract EnergyAMMTest is Test {
     }
 
     function testFuzz_bidAskSpread(uint256 EAmount) public {
-        (uint256 EMin, uint256 EMax) = AMM.askRange();
-        EAmount = EAmount % (EMax - EMin) + EMin;
+        (uint256 EBidMin, uint256 EBidMax) = AMM.bidRange();
+        (uint256 EAskMin, uint256 EAskMax) = AMM.askRange();
+        EAmount = EAmount % (EBidMax - EBidMin) + EBidMin;
+        EAmount = EAmount % (EAskMax - EAskMin) + EAskMin;
 
         UD60x18 bidPrice = AMM.bidPrice(EAmount);
         UD60x18 askPrice = AMM.askPrice(EAmount);
         SD59x18 bidAskSpread = AMM.bidAskSpread(EAmount);
 
         assertEqDecimal(bidAskSpread.unwrap(), (askPrice.intoSD59x18() - bidPrice.intoSD59x18()).unwrap(), 18);
+    }
+
+    function testFuzz_bidSlippage(uint256 EAmount) public {
+        (uint256 EMin, uint256 EMax) = AMM.bidRange();
+        EAmount = EAmount % (EMax - EMin) + EMin;
+
+        UD60x18 price = AMM.bidPrice(EAmount);
+        SD59x18 slippage = AMM.bidSlippage(EAmount);
+
+        assertEqDecimal(
+            slippage.unwrap(), ((price / AMM.poolPrice()).intoSD59x18() - convert(1).intoSD59x18()).unwrap(), 18
+        );
+    }
+
+    function testFuzz_askSlippage(uint256 EAmount) public {
+        (uint256 EMin, uint256 EMax) = AMM.askRange();
+        EAmount = EAmount % (EMax - EMin) + EMin;
+
+        UD60x18 price = AMM.askPrice(EAmount);
+        SD59x18 slippage = AMM.askSlippage(EAmount);
+
+        assertEqDecimal(
+            slippage.unwrap(), ((price / AMM.poolPrice()).intoSD59x18() - convert(1).intoSD59x18()).unwrap(), 18
+        );
     }
 }
