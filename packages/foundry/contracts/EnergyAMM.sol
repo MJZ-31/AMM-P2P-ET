@@ -410,7 +410,7 @@ contract EnergyAMM is Ownable {
      * @return The slippage of the bid.
      */
     function bidSlippage(uint256 EAmount) external view returns (SD59x18) {
-        return (this.bidPrice(EAmount) / this.poolPrice()).intoSD59x18() + convert(1).intoSD59x18();
+        return (this.bidPrice(EAmount) / this.poolPrice()).intoSD59x18() - convert(1).intoSD59x18();
     }
 
     /**
