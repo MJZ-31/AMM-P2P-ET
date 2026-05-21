@@ -72,7 +72,6 @@ error BidOutsideRange(uint256 EMin, uint256 EMax, uint256 EAmount);
  */
 error AskOutsideRange(uint256 EMin, uint256 EMax, uint256 EAmount);
 
-
 /**
  * @notice Thrown if the pool price bounds are set to an invalid range. For example, if the lower bound is greater than
  * the upper bound.
@@ -268,7 +267,8 @@ contract EnergyAMM is Ownable {
      */
     function askRange() external view returns (uint256 EMin, uint256 EMax) {
         EMin = 0;
-        EMax = (powu(liquidity, 2) / MVirtual.tokToUD(MToken) - (this.EReserve() + EVirtual).tokToUD(EToken)).UDToTok(EToken);
+        EMax = (powu(liquidity, 2) / MVirtual.tokToUD(MToken) - (this.EReserve() + EVirtual).tokToUD(EToken))
+        .UDToTok(EToken);
     }
 
     /**
@@ -431,15 +431,29 @@ contract EnergyAMM is Ownable {
      * @return ELiq The amount of ETokens required.
      */
     function liquidityProvision(uint256 EAmount) external view returns (uint256 MLiq, uint256 ELiq) {
-        if (EAmount == 0) {
-            return (0, 0);
+        uint256 EReserveNew = this.EReserve() + EAmount;
+        uint256 MReserveNew = (EReserveNew.tokToUD(EToken) * sqrt(poolPriceEquilibrium * poolPriceBoundUpper)
+                * (sqrt(poolPriceEquilibrium) - sqrt(poolPriceBoundLower))
+                / (sqrt(poolPriceBoundUpper) - sqrt(poolPriceEquilibrium)))
+        .UDToTok(MToken);
+
+        if (this.MReserve() > MReserveNew) {
+            MLiq = 0;
+        } else {
+            MLiq = MReserveNew - this.MReserve();
+        }
+        if (this.EReserve() > EReserveNew) {
+            ELiq = 0;
+        } else {
+            ELiq = EReserveNew - this.EReserve();
         }
 
-        MLiq = ((this.EReserve() + EAmount).tokToUD(EToken) * sqrt(poolPriceEquilibrium * poolPriceBoundUpper)
-                * (sqrt(poolPriceEquilibrium) - sqrt(poolPriceBoundLower))
-                / (sqrt(poolPriceBoundUpper) - sqrt(poolPriceEquilibrium)) - (this.MReserve()).tokToUD(MToken))
-        .UDToTok(MToken);
-        ELiq = EAmount;
+        if (MLiq == 0) {
+            ELiq = 0;
+        }
+        if (ELiq == 0) {
+            MLiq = 0;
+        }
     }
 
     /**
