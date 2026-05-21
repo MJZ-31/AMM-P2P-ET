@@ -3,7 +3,7 @@ pragma solidity ^0.8.30;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { UD60x18, convert, powu, sqrt } from "@prb/math/src/UD60x18.sol";
+import { UD60x18, convert, powu, sqrt, ud } from "@prb/math/src/UD60x18.sol";
 import { SD59x18 } from "@prb/math/src/SD59x18.sol";
 
 import { tokToUD, UDToTok } from "./Conversions.sol";
@@ -371,11 +371,11 @@ contract EnergyAMM is Ownable {
      * @return The price of energy.
      */
     function bidPrice(uint256 EAmount) external view returns (UD60x18) {
-        if (EAmount == 0) {
-            return convert(0);
-        }
-
         (uint256 MSwap, uint256 ESwap) = this.bidSwap(EAmount);
+
+        if (MSwap.tokToUD(MToken) == ud(0) || ESwap.tokToUD(EToken) == ud(0)) {
+            return ud(0);
+        }
         return MSwap.tokToUD(MToken) / ESwap.tokToUD(EToken);
     }
 
@@ -385,11 +385,11 @@ contract EnergyAMM is Ownable {
      * @return The price of energy.
      */
     function askPrice(uint256 EAmount) external view returns (UD60x18) {
-        if (EAmount == 0) {
-            return convert(0);
-        }
-
         (uint256 MSwap, uint256 ESwap) = this.askSwap(EAmount);
+
+        if (MSwap.tokToUD(MToken) == ud(0) || ESwap.tokToUD(EToken) == ud(0)) {
+            return ud(0);
+        }
         return MSwap.tokToUD(MToken) / ESwap.tokToUD(EToken);
     }
 
