@@ -189,7 +189,7 @@ interface IEnergyAMM {
     /**
      * @notice Executes a market swap to buy ETokens. The requested amount of ETokens will be transferred from the
      * liquidity pool to the sender. The corresponding amount of MTokens, plus fees, will be transferred from the sender
-     * to the liquidity pool. The fee will be spli among the liquidity providers in proportion to their liquidity
+     * to the liquidity pool. The fee will be split among the liquidity providers in proportion to their liquidity
      * shares.
      * @param EAmount The amount of ETokens being bought.
      * @return Information about the trade.
