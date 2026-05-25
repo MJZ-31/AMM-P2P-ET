@@ -6,6 +6,35 @@ import { UD60x18 } from "@prb/math/src/UD60x18.sol";
 import { SD59x18 } from "@prb/math/src/SD59x18.sol";
 
 /**
+ * @notice Emitted when the state of the market changes. This occurs on every buy, sell, or liquidity addition or
+ * removal.
+ */
+event MarketStateChanged();
+
+/**
+ * @notice Thrown if an operation is attempted with a value outside of the allowable range.
+ * @param min The lowest possible value.
+ * @param max The highest possible value.
+ * @param value The value outside of the range.
+ */
+error OutsideRange(uint256 min, uint256 max, uint256 value);
+
+/**
+ * @notice Thrown if a range is set with invalid values. For example, if the minimum is greater than the maximum.
+ * @param min The lowest value of the range.
+ * @param min The highest value of the range.
+ */
+error InvalidRange(uint256 min, uint256 max);
+
+/**
+ * @notice Thrown if an operation is attempted without the required allowance of an ERC20 token.
+ * @param token The ERC20 token the allowance is for.
+ * @param required The required allowance amount.
+ * @param allowance The actual allowance amount, which is less than the required amount.
+ */
+error InsufficientAllowance(IERC20 token, uint256 required, uint256 allowance);
+
+/**
  * @title Interface for an energy trading AMM.
  * @author Mitchel Justinen
  */
