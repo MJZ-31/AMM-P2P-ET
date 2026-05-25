@@ -172,12 +172,13 @@ interface IEnergyAMM {
     /**
      * @notice Returns the amount of MTokens and ETokens required for a liquidity addition.
      * @param LAmount The amount of LTokens being bought.
+     * @return LShare The amount of LTokens that will be minted and transferred to the sender for the liquidity addition.
      * @return MLiq The amount of MTokens that will be transferred from the sender to the liquidity pool for the
      * liquidity addition.
      * @return ELiq The amount of ETokens that will be transferred from the sender to the liquidity pool for the
      * liquidity addition.
      */
-    function liquidityProvision(uint256 LAmount) external view returns (uint256 MLiq, uint256 ELiq);
+    function liquidityProvision(uint256 LAmount) external view returns (uint256 LShare, uint256 MLiq, uint256 ELiq);
 
     /**
      * @notice Returns the proportion of liquidity shares that the sender holds.
