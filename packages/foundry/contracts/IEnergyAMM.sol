@@ -35,6 +35,12 @@ error InvalidRange(uint256 min, uint256 max);
 error InsufficientAllowance(IERC20 token, uint256 required, uint256 allowance);
 
 /**
+ * @notice Thrown if an asset amount as part of a transaction is zero. A transaction for nothing is not worth
+ * processing.
+ */
+error ZeroTransfer();
+
+/**
  * @title Interface for an energy trading AMM.
  * @author Mitchel Justinen
  */
