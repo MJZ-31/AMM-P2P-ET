@@ -205,15 +205,20 @@ interface IEnergyAMM {
     function liquidityAdditionRange() external view returns (uint256 min, uint256 max);
 
     /**
-     * @notice Returns the amount of MTokens and ETokens required for a liquidity addition.
-     * @param LAmount The amount of LTokens being bought.
-     * @return LShare The amount of LTokens that will be minted and transferred to the sender for the liquidity addition.
-     * @return MLiq The amount of MTokens that will be transferred from the sender to the liquidity pool for the
-     * liquidity addition.
-     * @return ELiq The amount of ETokens that will be transferred from the sender to the liquidity pool for the
-     * liquidity addition.
+     * @notice Returns the amount of LTokens rewarded for a liquidity addition and the amounts of MTokens and ETokens to
+     * add.
+     * @param MAmount The amount of MTokens being added to the liquidity pool.
+     * @param EAmount The amount of ETokens being added to the liquidity pool.
+     * @return LShare The amount of LTokens that will be minted and transferred to the sender.
+     * @return MLiq The amount of MTokens that will be transferred from the sender to the liquidity pool. This may be
+     * lower than MAmount to keep the addition price point in the pool price range.
+     * @return ELiq The amount of ETokens that will be transferred from the sender to the liquidity pool. This may be
+     * lower than MAmount to keep the addition price point in the pool price range.
      */
-    function liquidityProvision(uint256 LAmount) external view returns (uint256 LShare, uint256 MLiq, uint256 ELiq);
+    function liquidityProvision(uint256 MAmount, uint256 EAmount)
+        external
+        view
+        returns (uint256 LShare, uint256 MLiq, uint256 ELiq);
 
     /**
      * @notice Returns the proportion of liquidity shares that the sender holds.
@@ -276,19 +281,19 @@ interface IEnergyAMM {
      * @param min The lowest possible bid amount.
      * @param max The highest possible bid amount.
      */
-    function setBidRange(UD60x18 min, UD60x18 max) external;
+    function setBidRange(uint256 min, uint256 max) external;
 
     /**
      * @notice Sets the ask range.
      * @param min The lowest possible ask amount.
      * @param max The highest possible ask amount.
      */
-    function setAskRange(UD60x18 min, UD60x18 max) external;
+    function setAskRange(uint256 min, uint256 max) external;
 
     /**
      * @notice Sets the liquidity addition range.
      * @param min The lowest possible addition amount.
      * @param max The highest possible addition amount.
      */
-    function setLiquidityAdditionRange(UD60x18 min, UD60x18 max) external;
+    function setLiquidityAdditionRange(uint256 min, uint256 max) external;
 }
