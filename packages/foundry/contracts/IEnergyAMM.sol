@@ -289,11 +289,4 @@ interface IEnergyAMM {
      * @param max The highest possible ask amount.
      */
     function setAskRange(uint256 min, uint256 max) external;
-
-    /**
-     * @notice Sets the liquidity addition range.
-     * @param min The lowest possible addition amount.
-     * @param max The highest possible addition amount.
-     */
-    function setLiquidityAdditionRange(uint256 min, uint256 max) external;
 }
