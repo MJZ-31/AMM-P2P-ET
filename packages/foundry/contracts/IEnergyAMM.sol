@@ -198,13 +198,6 @@ interface IEnergyAMM {
     function askSlippage(uint256 EAmount) external view returns (SD59x18);
 
     /**
-     * @notice Returns the range of allowable amounts for a liquidity addition.
-     * @return min The lowest possible addition amount.
-     * @return max The highest possible addition amount.
-     */
-    function liquidityAdditionRange() external view returns (uint256 min, uint256 max);
-
-    /**
      * @notice Returns the amount of LTokens rewarded for a liquidity addition and the amounts of MTokens and ETokens to
      * add.
      * @param MAmount The amount of MTokens being added to the liquidity pool.
