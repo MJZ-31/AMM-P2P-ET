@@ -20,13 +20,6 @@ event MarketStateChanged();
 error OutsideRange(uint256 min, uint256 max, uint256 value);
 
 /**
- * @notice Thrown if a range is set with invalid values. For example, if the minimum is greater than the maximum.
- * @param min The lowest value of the range.
- * @param min The highest value of the range.
- */
-error InvalidRange(uint256 min, uint256 max);
-
-/**
  * @notice Thrown if an operation is attempted without the required allowance of an ERC20 token.
  * @param token The ERC20 token the allowance is for.
  * @param required The required allowance amount.
@@ -39,6 +32,12 @@ error InsufficientAllowance(IERC20 token, uint256 required, uint256 allowance);
  * processing.
  */
 error ZeroTransfer();
+
+/**
+ * @notice Thrown if an invalid range is used for an operation.
+ * @param range The invalid range.
+ */
+error InvalidRange(Range range);
 
 /**
  * @notice A structure representing a range of possible uint256 values between a minimum and maximum. The minumum and
