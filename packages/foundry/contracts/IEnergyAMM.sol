@@ -2,6 +2,7 @@
 pragma solidity ^0.8.30;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import { UD60x18 } from "@prb/math/src/UD60x18.sol";
 import { SD59x18 } from "@prb/math/src/SD59x18.sol";
 
@@ -196,6 +197,15 @@ interface IEnergyAMM {
         external
         view
         returns (uint256 LShare, uint256 MLiq, uint256 ELiq);
+
+    /**
+     * @notice Returns the amount of MTokens and ETokens to be returned to a liquidity provider for a liquidity removal.
+     * @param LAmount The amount of LTokens being given up by the liquidity provider.
+     * @return LShare The amount of LTokens that will be transferred from the sender and burned.
+     * @return MLiq The amount of MTokens that will be transferred from the liquidity pool to the sender.
+     * @return ELiq The amount of ETokens that will be transferred from the liquidity pool to the sender.
+     */
+    function liquidityReduction(uint256 LAmount) external view returns (uint256 LShare, uint256 MLiq, uint256 ELiq);
 
     /**
      * @notice Returns the proportion of liquidity shares that the sender holds.
