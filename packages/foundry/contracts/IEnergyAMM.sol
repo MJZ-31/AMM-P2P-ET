@@ -52,6 +52,20 @@ struct Range {
 }
 
 /**
+ * @notice Returns whether or not a range is valid. A range is invalid if its minimum is greater than its maximum. A
+ * range is always valid if either the minimum or the maximum are unbounded.
+ * @param range The range to check.
+ * @return True if the range is valid, false if not.
+ */
+function isValid(Range memory range) pure returns (bool) {
+    if (!range.isMinUnbounded && !range.isMaxUnbounded && range.min > range.max) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+/**
  * @notice Information about a trade.
  */
 struct TradeInfo {
