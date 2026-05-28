@@ -87,4 +87,40 @@ library RangeOps {
 
         return out;
     }
+
+    /**
+     * @notice Sets the minimum value of the range.
+     * @param range The range to manipulate.
+     * @param min The minimum.
+     */
+    function setMin(Range memory range, uint256 min) public {
+        range.min = min;
+        range.isMinUnbounded = false;
+    }
+
+    /**
+     * @notice Sets the maximum value of the range.
+     * @param range The range to manipulate.
+     * @param max The maximum.
+     */
+    function setMax(Range memory range, uint256 max) public {
+        range.max = max;
+        range.isMinUnbounded = false;
+    }
+
+    /**
+     * @notice Unbounds the range's minimum.
+     * @param range The range to manipulate.
+     */
+    function unboundMin(Range memory range) public {
+        range.isMinUnbounded = true;
+    }
+
+    /**
+     * @notice Unbounds the range's maximum.
+     * @param range The range to manipulate.
+     */
+    function unboundMax(Range memory range) public {
+        range.isMaxUnbounded = true;
+    }
 }
