@@ -41,6 +41,17 @@ error InsufficientAllowance(IERC20 token, uint256 required, uint256 allowance);
 error ZeroTransfer();
 
 /**
+ * @notice A structure representing a range of possible uint256 values between a minimum and maximum. The minumum and
+ * maximum can both be unbounded.
+ */
+struct Range {
+    uint256 min;
+    uint256 max;
+    bool isMinUnbounded;
+    bool isMaxUnbounded;
+}
+
+/**
  * @notice Information about a trade.
  */
 struct TradeInfo {
@@ -106,10 +117,9 @@ interface IEnergyAMM {
 
     /**
      * @notice Returns the range of possible values for the pool price.
-     * @return min The lowest possible pool price.
-     * @return max The highest possible pool price.
+     * @return The pool price range.
      */
-    function poolPriceRange() external view returns (UD60x18 min, UD60x18 max);
+    function poolPriceRange() external view returns (Range memory);
 
     /**
      * @notice Returns the MToken per EToken price of energy in the market.
@@ -125,17 +135,15 @@ interface IEnergyAMM {
 
     /**
      * @notice Returns the range of possible amounts of ETokens for a bid.
-     * @return min The lowest possible bid amount.
-     * @return max The highest possible bid amount.
+     * @return The bid range.
      */
-    function bidRange() external view returns (uint256 min, uint256 max);
+    function bidRange() external view returns (Range memory);
 
     /**
      * @notice Returns the range of possible amounts of ETokens for an ask.
-     * @return min The lowest possible ask amount.
-     * @return max The highest possible ask amount.
+     * @return The ask range.
      */
-    function askRange() external view returns (uint256 min, uint256 max);
+    function askRange() external view returns (Range memory);
 
     /**
      * @notice Returns the amount of MTokens and ETokens that will be swapped for a bid.
@@ -259,10 +267,9 @@ interface IEnergyAMM {
 
     /**
      * @notice Sets the pool price range.
-     * @param min The lowest possible pool price.
-     * @param max The highest possible pool price.
+     * @param range The pool price range.
      */
-    function setPoolPriceRange(UD60x18 min, UD60x18 max) external;
+    function setPoolPriceRange(Range memory range) external;
 
     /**
      * @notice Sets the fee rate.
@@ -272,15 +279,13 @@ interface IEnergyAMM {
 
     /**
      * @notice Sets the bid range.
-     * @param min The lowest possible bid amount.
-     * @param max The highest possible bid amount.
+     * @param range The bid range.
      */
-    function setBidRange(uint256 min, uint256 max) external;
+    function setBidRange(Range memory range) external;
 
     /**
      * @notice Sets the ask range.
-     * @param min The lowest possible ask amount.
-     * @param max The highest possible ask amount.
+     * @param range The ask range.
      */
-    function setAskRange(uint256 min, uint256 max) external;
+    function setAskRange(Range memory range) external;
 }
