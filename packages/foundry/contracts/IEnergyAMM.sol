@@ -41,35 +41,35 @@ error InsufficientAllowance(IERC20 token, uint256 required, uint256 allowance);
 error ZeroTransfer();
 
 /**
+ * @notice Information about a trade.
+ */
+struct TradeInfo {
+    address trader;
+    string op;
+    uint256 MAmount;
+    uint256 EAmount;
+    uint256 fee;
+    UD60x18 poolPrice;
+    UD60x18 tradePrice;
+    SD59x18 slippage;
+}
+
+/**
+ * @notice Information about a liquidity addition or removal.
+ */
+struct LiquidityInfo {
+    address provider;
+    string op;
+    uint256 MAmount;
+    uint256 EAmount;
+    uint256 LAmount;
+}
+
+/**
  * @title Interface for an energy trading AMM.
  * @author Mitchel Justinen
  */
 interface IEnergyAMM {
-    /**
-     * @notice Information about a trade.
-     */
-    struct TradeInfo {
-        address trader;
-        string op;
-        uint256 MAmount;
-        uint256 EAmount;
-        uint256 fee;
-        UD60x18 poolPrice;
-        UD60x18 tradePrice;
-        SD59x18 slippage;
-    }
-
-    /**
-     * @notice Information about a liquidity addition or removal.
-     */
-    struct LiquidityInfo {
-        address provider;
-        string op;
-        uint256 MAmount;
-        uint256 EAmount;
-        uint256 LAmount;
-    }
-
     /**
      * @notice Returns the address of an ERC20 token representing currency.
      * @return The address of the MToken.
@@ -240,12 +240,13 @@ interface IEnergyAMM {
     function sell(uint256 EAmount) external returns (TradeInfo memory);
 
     /**
-     * @notice Executes a liquidity addition. The desired amount of LTokens will be minted and transferred to the
-     * sender. A corresponding amount of MTokens and ETokens will be transferred from the sender to the liquidity pool.
-     * @param LAmount The amount of LTokens being bought.
+     * @notice Executes a liquidity addition. The desired amount of MTokens and ETokens will be transferred from the
+     * sender to the liquidity pool. A corresponding amount of LTokens will be minted and transferred to the sender.
+     * @param MAmount The amount of MTokens being added.
+     * @param EAmount The amount of ETokens being added.
      * @return Information about the liquidity addition.
      */
-    function addLiquidity(uint256 LAmount) external returns (LiquidityInfo memory);
+    function addLiquidity(uint256 MAmount, uint256 EAmount) external returns (LiquidityInfo memory);
 
     /**
      * @notice Executes a liquidity removal. The desired amount of LTokens will be transferred from the sender and
