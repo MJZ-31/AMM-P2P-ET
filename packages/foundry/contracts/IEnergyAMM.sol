@@ -5,19 +5,13 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { UD60x18 } from "@prb/math/src/UD60x18.sol";
 import { SD59x18 } from "@prb/math/src/SD59x18.sol";
 
+import { Range } from "./Range.sol";
+
 /**
  * @notice Emitted when the state of the market changes. This occurs on every buy, sell, or liquidity addition or
  * removal.
  */
 event MarketStateChanged();
-
-/**
- * @notice Thrown if an operation is attempted with a value outside of the allowable range.
- * @param min The lowest possible value.
- * @param max The highest possible value.
- * @param value The value outside of the range.
- */
-error OutsideRange(uint256 min, uint256 max, uint256 value);
 
 /**
  * @notice Thrown if an operation is attempted without the required allowance of an ERC20 token.
@@ -32,37 +26,6 @@ error InsufficientAllowance(IERC20 token, uint256 required, uint256 allowance);
  * processing.
  */
 error ZeroTransfer();
-
-/**
- * @notice Thrown if an invalid range is used for an operation.
- * @param range The invalid range.
- */
-error InvalidRange(Range range);
-
-/**
- * @notice A structure representing a range of possible uint256 values between a minimum and maximum. The minumum and
- * maximum can both be unbounded.
- */
-struct Range {
-    uint256 min;
-    uint256 max;
-    bool isMinUnbounded;
-    bool isMaxUnbounded;
-}
-
-/**
- * @notice Returns whether or not a range is valid. A range is invalid if its minimum is greater than its maximum. A
- * range is always valid if either the minimum or the maximum are unbounded.
- * @param range The range to check.
- * @return True if the range is valid, false if not.
- */
-function isValid(Range memory range) pure returns (bool) {
-    if (!range.isMinUnbounded && !range.isMaxUnbounded && range.min > range.max) {
-        return false;
-    } else {
-        return true;
-    }
-}
 
 /**
  * @notice Information about a trade.
