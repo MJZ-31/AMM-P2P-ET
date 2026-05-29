@@ -48,9 +48,11 @@ struct TradeInfo {
 struct LiquidityInfo {
     address provider;
     string op;
-    uint256 MAmount;
-    uint256 EAmount;
-    uint256 LAmount;
+    uint256 MLiq;
+    uint256 ELiq;
+    uint256 LShare;
+    UD60x18 poolPrice;
+    UD60x18 liqPrice;
 }
 
 /**
