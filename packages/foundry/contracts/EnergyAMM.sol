@@ -465,10 +465,16 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         uint256 MShare = (_liquidityProportion(msg.sender) * this.MReserve().tokToUD(_MToken)).UDToTok(_MToken);
         uint256 EShare = (_liquidityProportion(msg.sender) * this.EReserve().tokToUD(_EToken)).UDToTok(_EToken);
 
-        MLiq = (MShare.tokToUD(_MToken) * LAmount.tokToUD(_LToken) / _LToken.balanceOf(msg.sender).tokToUD(_LToken))
-        .UDToTok(_MToken);
-        ELiq = (EShare.tokToUD(_EToken) * LAmount.tokToUD(_LToken) / _LToken.balanceOf(msg.sender).tokToUD(_LToken))
-        .UDToTok(_EToken);
+        if (LAmount > _LToken.balanceOf(msg.sender)) {
+            LAmount = _LToken.balanceOf(msg.sender);
+        }
+
+        if (LAmount != 0) {
+            MLiq = (MShare.tokToUD(_MToken) * LAmount.tokToUD(_LToken) / _LToken.balanceOf(msg.sender).tokToUD(_LToken))
+            .UDToTok(_MToken);
+            ELiq = (EShare.tokToUD(_EToken) * LAmount.tokToUD(_LToken) / _LToken.balanceOf(msg.sender).tokToUD(_LToken))
+            .UDToTok(_EToken);
+        }
         LShare = LAmount;
 
         if (MLiq == 0) {
