@@ -491,6 +491,9 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @return The proportion of liquidity.
      */
     function _liquidityProportion(address provider) internal view returns (UD60x18) {
+        if (_LToken.totalSupply().tokToUD(_LToken) == convert(0)) {
+            return convert(0);
+        }
         return _LToken.balanceOf(provider).tokToUD(_LToken) / _LToken.totalSupply().tokToUD(_LToken);
     }
 
