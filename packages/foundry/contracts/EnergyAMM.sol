@@ -294,9 +294,13 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     function askRange() external view returns (Range memory) {
         Range memory absoluteRange;
         absoluteRange.min = 0;
-        absoluteRange.max = (powu(_liquidity, 2) / _MVirtual.tokToUD(_MToken)
-                - (this.EReserve() + _EVirtual).tokToUD(_EToken))
-        .UDToTok(_EToken);
+        if (_MVirtual.tokToUD(_MToken) == convert(0)) {
+            absoluteRange.max = 0;
+        } else {
+            absoluteRange.max = (powu(_liquidity, 2) / _MVirtual.tokToUD(_MToken)
+                    - (this.EReserve() + _EVirtual).tokToUD(_EToken))
+            .UDToTok(_EToken);
+        }
         absoluteRange.isMinUnbounded = false;
         absoluteRange.isMaxUnbounded = false;
 
