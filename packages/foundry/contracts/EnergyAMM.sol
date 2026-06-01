@@ -72,11 +72,6 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     Range private _poolPriceSqrtRange;
 
     /**
-     * @dev The square root of the pool price when the liquidity pool contains the same amount of MTokens and ETokens.
-     */
-    UD60x18 _poolPriceSqrtEq;
-
-    /**
      * @dev The range possible bid amounts.
      */
     Range private _bidRange;
@@ -211,9 +206,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         UD60x18 M = MAmount.tokToUD(_MToken);
         UD60x18 E = EAmount.tokToUD(_EToken);
 
-        if (M == convert(0) && E == convert(0)) {
-            return powu(_poolPriceSqrtEq, 2);
-        } else if (M == convert(0) || E == convert(0)) {
+        if (M == convert(0) || E == convert(0)) {
             return convert(0);
         } else {
             return M / E;
@@ -639,14 +632,6 @@ contract EnergyAMM is Ownable, IEnergyAMM {
             revert InvalidRange(range);
         }
         _poolPriceSqrtRange = range;
-
-        uint256 MBase = 10 ** _MToken.decimals();
-        uint256 EBase = 10 ** _EToken.decimals();
-        UD60x18 liquidityBase = _calculateLiquidity(MBase, EBase, _poolPriceSqrtRange);
-        uint256 MVirtualBase = _calculateMVirtual(liquidityBase, _poolPriceSqrtRange);
-        uint256 EVirtualBase = _calculateEVirtual(liquidityBase, _poolPriceSqrtRange);
-
-        _poolPriceSqrtEq = sqrt(_calculatePrice(MBase + MVirtualBase, EBase + EVirtualBase));
     }
 
     /**
