@@ -631,7 +631,10 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         if (!range.isValid()) {
             revert InvalidRange(range);
         }
-        _poolPriceSqrtRange = range;
+        _poolPriceSqrtRange.min = sqrt(ud(range.min)).unwrap();
+        _poolPriceSqrtRange.max = sqrt(ud(range.max)).unwrap();
+        _poolPriceSqrtRange.isMinUnbounded = range.isMinUnbounded;
+        _poolPriceSqrtRange.isMaxUnbounded = range.isMaxUnbounded;
     }
 
     /**
