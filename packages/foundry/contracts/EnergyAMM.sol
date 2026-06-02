@@ -429,9 +429,9 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         UD60x18 price = MLiq.tokToUD(_MToken) / ELiq.tokToUD(_EToken);
 
-        if (price < powu(ud(_poolPriceSqrtRange.min), 2)) {
+        if (!_poolPriceSqrtRange.isMinUnbounded && price < powu(ud(_poolPriceSqrtRange.min), 2)) {
             ELiq = (MLiq.tokToUD(_MToken) / powu(ud(_poolPriceSqrtRange.min), 2)).UDToTok(_EToken);
-        } else if (price > powu(ud(_poolPriceSqrtRange.max), 2)) {
+        } else if (!_poolPriceSqrtRange.isMaxUnbounded && price > powu(ud(_poolPriceSqrtRange.max), 2)) {
             MLiq = (ELiq.tokToUD(_EToken) * powu(ud(_poolPriceSqrtRange.max), 2)).UDToTok(_MToken);
         }
 
