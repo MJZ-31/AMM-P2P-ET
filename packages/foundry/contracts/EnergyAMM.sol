@@ -192,7 +192,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         if (liquidity_ == convert(0) || poolPriceSqrtRange_.isMaxUnbounded) {
             return 0;
         } else {
-            return (liquidity_ / ud(poolPriceSqrtRange_.max)).UDToTok(_MToken);
+            return (liquidity_ / ud(poolPriceSqrtRange_.max)).UDToTok(_EToken);
         }
     }
 
