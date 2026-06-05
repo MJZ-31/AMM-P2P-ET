@@ -55,15 +55,16 @@ library RangeOps {
     function contains(Range memory range, uint256 value) public pure returns (bool) {
         if (!isValid(range)) {
             return false;
-        } else if (range.isMinUnbounded && range.isMaxUnbounded) {
-            return true;
-        } else if (range.isMinUnbounded && value <= range.max) {
-            return true;
-        } else if (range.isMaxUnbounded && range.min <= value) {
-            return true;
-        } else {
+        }
+
+        if (!range.isMinUnbounded && value < range.min) {
             return false;
         }
+        if (!range.isMaxUnbounded && value > range.max) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
