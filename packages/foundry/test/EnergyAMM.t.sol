@@ -45,6 +45,7 @@ contract EnergyAMMTest is Test {
     function setUp() public {
         owner = vm.randomAddress();    
         liquidityProvider1 = vm.randomAddress();    
+        liquidityProvider2 = vm.randomAddress();    
         trader = vm.randomAddress();    
 
         uint8 EDecimals = uint8(vm.randomUint() % 15 + 6);
@@ -79,9 +80,9 @@ contract EnergyAMMTest is Test {
 
         uint256 ELiq = vm.randomUint() % EToken.balanceOf(liquidityProvider1);
         uint256 MLiq = vm.randomUint() % MToken.balanceOf(liquidityProvider1);
-        UD60x18 proportion = vm.randomUint() % 1e18;
-        uint256 ELiq1 = ELiq * proportion / 1e18;
-        uint256 MLiq1 = MLiq * proportion / 1e18;
+        UD60x18 proportion = ud(vm.randomUint() % 1e18);
+        uint256 ELiq1 = ELiq * proportion.unwrap() / 1e18;
+        uint256 MLiq1 = MLiq * proportion.unwrap() / 1e18;
         uint256 ELiq2 = ELiq - ELiq1;
         uint256 MLiq2 = MLiq - MLiq1;
         (, ELiq1, MLiq1) = AMM.liquidityProvision(ELiq1, MLiq1);
@@ -130,28 +131,14 @@ contract EnergyAMMTest is Test {
 
     function testFuzz_bidSwap(uint256 EAmount) public {
         Range memory bidRange = AMM.bidRange();
-        if (!bidRange.isMinUnbounded && !bidRange.isMaxUnbounded) {
-            EAmount = EAmount % (bidRange.max - bidRange.min) + bidRange.min;
-        } else if (!bidRange.isMinUnbounded) {
-            EAmount = EAmount % bidRange.max;
-        } else if (!bidRange.isMaxUnbounded) {
-            EAmount = EAmount % (0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF - bidRange.min) +
-                bidRange.min;
-        }
+        EAmount = clampRange(EAmount, bidRange);
         (uint256 ESwap, uint256 MSwap) = AMM.bidSwap(EAmount);
         assert((ESwap == 0 && MSwap == 0) || (ESwap != 0 && MSwap != 0));
     }
 
     function testFuzz_askSwap(uint256 EAmount) public {
         Range memory askRange = AMM.askRange();
-        if (!askRange.isMinUnbounded && !askRange.isMaxUnbounded) {
-            EAmount = EAmount % (askRange.max - askRange.min) + askRange.min;
-        } else if (!askRange.isMinUnbounded) {
-            EAmount = EAmount % askRange.max;
-        } else if (!askRange.isMaxUnbounded) {
-            EAmount = EAmount % (0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF - askRange.min) +
-                askRange.min;
-        }
+        EAmount = clampRange(EAmount, askRange);
         (uint256 ESwap, uint256 MSwap) = AMM.askSwap(EAmount);
         assert((ESwap == 0 && MSwap == 0) || (ESwap != 0 && MSwap != 0));
     }
