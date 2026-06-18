@@ -23,8 +23,8 @@ error OutsideRange(Range range, uint256 value);
 struct Range {
     uint256 min;
     uint256 max;
-    bool isMinUnbounded;
-    bool isMaxUnbounded;
+    bool isMinBounded;
+    bool isMaxBounded;
 }
 
 /**
@@ -39,7 +39,7 @@ library RangeOps {
      * @return True if the range is valid, false if not.
      */
     function isValid(Range memory range) public pure returns (bool) {
-        if (!range.isMinUnbounded && !range.isMaxUnbounded && range.min > range.max) {
+        if (range.isMinBounded && range.isMaxBounded && range.min > range.max) {
             return false;
         } else {
             return true;
@@ -57,10 +57,10 @@ library RangeOps {
             return false;
         }
 
-        if (!range.isMinUnbounded && value < range.min) {
+        if (range.isMinBounded && value < range.min) {
             return false;
         }
-        if (!range.isMaxUnbounded && value > range.max) {
+        if (range.isMaxBounded && value > range.max) {
             return false;
         }
 
@@ -77,12 +77,12 @@ library RangeOps {
     function intersect(Range memory range1, Range memory range2) public pure returns (Range memory) {
         Range memory out;
 
-        out.isMinUnbounded = range1.isMinUnbounded && range2.isMinUnbounded;
-        out.isMaxUnbounded = range1.isMaxUnbounded && range2.isMaxUnbounded;
-        if (!out.isMinUnbounded) {
+        out.isMinBounded = range1.isMinBounded || range2.isMinBounded;
+        out.isMaxBounded = range1.isMaxBounded || range2.isMaxBounded;
+        if (out.isMinBounded) {
             out.min = Math.max(range1.min, range2.min);
         }
-        if (!out.isMaxUnbounded) {
+        if (out.isMaxBounded) {
             out.max = Math.min(range1.max, range2.max);
         }
 
@@ -96,7 +96,7 @@ library RangeOps {
      */
     function setMin(Range memory range, uint256 min) public {
         range.min = min;
-        range.isMinUnbounded = false;
+        range.isMinBounded = true;
     }
 
     /**
@@ -106,22 +106,22 @@ library RangeOps {
      */
     function setMax(Range memory range, uint256 max) public {
         range.max = max;
-        range.isMinUnbounded = false;
+        range.isMinBounded = true;
     }
 
     /**
-     * @notice Unbounds the range's minimum.
+     * @notice Unsets the range's minimum.
      * @param range The range to manipulate.
      */
-    function unboundMin(Range memory range) public {
-        range.isMinUnbounded = true;
+    function unsetMin(Range memory range) public {
+        range.isMinBounded = false;
     }
 
     /**
-     * @notice Unbounds the range's maximum.
+     * @notice Unsets the range's maximum.
      * @param range The range to manipulate.
      */
-    function unboundMax(Range memory range) public {
-        range.isMaxUnbounded = true;
+    function unsetMax(Range memory range) public {
+        range.isMaxBounded = false;
     }
 }
