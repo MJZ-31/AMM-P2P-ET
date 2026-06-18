@@ -7,7 +7,7 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import { SD59x18 } from "@prb/math/src/SD59x18.sol";
-import { UD60x18, convert, powu, sqrt, ud } from "@prb/math/src/UD60x18.sol";
+import { UD60x18, convert, inv, powu, sqrt, ud } from "@prb/math/src/UD60x18.sol";
 
 import { tokToUD, UDToTok } from "./Conversions.sol";
 import { ERC20Ownable } from "./ERC20Ownable.sol";
@@ -33,16 +33,16 @@ using { UDToTok } for UD60x18;
  */
 contract EnergyAMM is Ownable, IEnergyAMM {
     /**
-     * @dev An ERC20 token representing real currency. The liquidity pool includes a balance of this token which is
-     * swapped with traders.
-     */
-    IERC20Metadata private _MToken;
-
-    /**
      * @dev An ERC20 token representing energy. The liquidity pool includes a balance of this token which is swapped
      * with traders.
      */
     IERC20Metadata private _EToken;
+
+    /**
+     * @dev An ERC20 token representing real currency. The liquidity pool includes a balance of this token which is
+     * swapped with traders.
+     */
+    IERC20Metadata private _MToken;
 
     /**
      * @dev An ERC20 token representing liquidity shares.
@@ -52,13 +52,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @dev The liquidity constant of the pricing curve.
      */
-    UD60x18 private _liquidity;
-
-    /**
-     * @dev The amount of virtual MTokens in the liquidity pool. Virtual assets cannot leave the liquidity pool and
-     * exist purely to force the pool price into a specified range.
-     */
-    uint256 private _MVirtual;
+    uint256 private _liquidity;
 
     /**
      * @dev The amount of virtual ETokens in the liquidity pool. Virtual assets cannot leave the liquidity pool and
@@ -67,9 +61,20 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     uint256 private _EVirtual;
 
     /**
+     * @dev The amount of virtual MTokens in the liquidity pool. Virtual assets cannot leave the liquidity pool and
+     * exist purely to force the pool price into a specified range.
+     */
+    uint256 private _MVirtual;
+
+    /**
+     * @dev The range of possible pool prices.
+     */
+    Range private _poolPriceRangeX18;
+
+    /**
      * @dev The range of possible pool prices, expressed as the square root of the pool price.
      */
-    Range private _poolPriceSqrtRange;
+    Range private _poolPriceSqrtRangeX18;
 
     /**
      * @dev The range possible bid amounts.
@@ -92,132 +97,128 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     modifier liquidityShift() {
         _;
 
-        _liquidity = _calculateLiquidity(this.MReserve(), this.EReserve(), _poolPriceSqrtRange);
-        _MVirtual = _calculateMVirtual(_liquidity, _poolPriceSqrtRange);
-        _EVirtual = _calculateEVirtual(_liquidity, _poolPriceSqrtRange);
+        _liquidity = _calculateLiquidity(this.EReserve(), this.MReserve(), _poolPriceSqrtRangeX18);
+        _EVirtual = _calculateEVirtual(_liquidity, _poolPriceSqrtRangeX18);
+        _MVirtual = _calculateMVirtual(_liquidity, _poolPriceSqrtRangeX18);
     }
 
-    constructor(IERC20Metadata MToken_, IERC20Metadata EToken_) Ownable(msg.sender) {
-        require(address(MToken_) != address(0), "Invalid MToken contract address");
+    constructor(IERC20Metadata EToken_, IERC20Metadata MToken_) Ownable(msg.sender) {
         require(address(EToken_) != address(0), "Invalid EToken contract address");
-        require(address(MToken_) != address(EToken_), "MToken and EToken contract addresses must be different");
+        require(address(MToken_) != address(0), "Invalid MToken contract address");
+        require(address(EToken_) != address(MToken_), "EToken and MToken contract addresses must be different");
 
-        _MToken = MToken_;
         _EToken = EToken_;
+        _MToken = MToken_;
         _LToken = new ERC20Ownable("EnergyAMM Liquidity Token", "ELIQ", EToken_.decimals());
 
-        _liquidity = convert(0);
-        _MVirtual = 0;
+        _liquidity = 0;
         _EVirtual = 0;
+        _MVirtual = 0;
 
-        _poolPriceSqrtRange.unboundMin();
-        _poolPriceSqrtRange.unboundMax();
-
-        _bidRange.unboundMin();
-        _bidRange.unboundMax();
-
-        _askRange.unboundMin();
-        _askRange.unboundMax();
-
-        feeRate = convert(0);
+        feeRate = ud(0);
     }
 
     /**
      * @dev Returns the liquidity of the market given the market reserve amounts and the pool price range.
-     * @param MReserve_ The amount of MTokens in reserve.
      * @param EReserve_ The amount of ETokens in reserve.
-     * @param poolPriceSqrtRange_ The range of possible pool prices, expressed as the square root of the pool price.
+     * @param MReserve_ The amount of MTokens in reserve.
+     * @param poolPriceSqrtRangeX18_ The range of possible pool prices, expressed as the square root of the pool price.
      * @return The liquidity of the market.
      */
-    function _calculateLiquidity(uint256 MReserve_, uint256 EReserve_, Range storage poolPriceSqrtRange_)
+    function _calculateLiquidity(uint256 EReserve_, uint256 MReserve_, Range storage poolPriceSqrtRangeX18_)
         internal
         view
-        returns (UD60x18)
+        returns (uint256)
     {
-        UD60x18 M = MReserve_.tokToUD(_MToken);
-        UD60x18 E = EReserve_.tokToUD(_EToken);
+        uint256 E = EReserve_;
+        uint256 M = MReserve_;
+        UD60x18 pLoS = ud(poolPriceSqrtRangeX18_.min);
+        UD60x18 pHiS = ud(poolPriceSqrtRangeX18_.max);
 
-        UD60x18 p_lo_sqrt = ud(poolPriceSqrtRange_.min);
-        UD60x18 p_hi_sqrt = ud(poolPriceSqrtRange_.max);
+        if (poolPriceSqrtRangeX18_.isMinBounded && poolPriceSqrtRangeX18_.isMaxBounded) {
+            if (poolPriceSqrtRangeX18_.min == poolPriceSqrtRangeX18_.max) {
+                // Pool price is bounded to a single value. Use the Constant Sum pricing curve.
+                return E * powu(pLoS, 2).unwrap() / 1e18 + M;
+            } else {
+                // Pool price is bounded on both sides, but not to a single value. Use the Concentrated Liquidity pricing curve.
+                UD60x18 a = convert(1) - pLoS / pHiS;
+                uint256 v1 = E * pLoS.unwrap() / 1e18;
+                uint256 v2 = M * 1e18 / pHiS.unwrap();
+                uint256 b1 = v1 + v2;
+                uint256 b2 = v1 > v2 ? v1 - v2 : v2 - v1;
+                uint256 c = M * E;
 
-        if (poolPriceSqrtRange_.isMinUnbounded && poolPriceSqrtRange_.isMaxUnbounded) {
-            // Pool price is unbounded. Use the Constant Product pricing curve.
-            return sqrt(M * E);
-        } else if (poolPriceSqrtRange_.isMinUnbounded) {
+                return (b1 + Math.sqrt(b2 ** 2 + 4 * c)) * 1e18 / (2 * a.unwrap());
+            }
+        } else if (poolPriceSqrtRangeX18_.isMinBounded) {
             // Pool price is bounded on only the low side. Use a partial Concentrated Liquidity pricing curve.
-            UD60x18 b = M / p_hi_sqrt;
-            UD60x18 c = M * E;
+            uint256 b = E * pLoS.unwrap() / 1e18;
+            uint256 c = M * E;
 
-            return (b + sqrt(powu(b, 2) + convert(4) * c)) / convert(2);
-        } else if (poolPriceSqrtRange_.isMaxUnbounded) {
+            return (b + Math.sqrt(b ** 2 + 4 * c)) / 2;
+        } else if (poolPriceSqrtRangeX18_.isMaxBounded) {
             // Pool price is bounded on only the high side. Use a partial Concentrated Liquidity pricing curve.
-            UD60x18 b = M * p_lo_sqrt;
-            UD60x18 c = M * E;
+            uint256 b = M * 1e18 / pHiS.unwrap();
+            uint256 c = M * E;
 
-            return (b + sqrt(powu(b, 2) + convert(4) * c)) / convert(2);
-        } else if (poolPriceSqrtRange_.min == poolPriceSqrtRange_.max) {
-            // Pool price is bounded to a single value. Use the Constant Sum pricing curve.
-            return M + E * powu(ud(poolPriceSqrtRange_.min), 2);
+            return (b + Math.sqrt(b ** 2 + 4 * c)) / 2;
         } else {
-            // Pool price is bounded on both sides, but not to a single value. Use the Concentrated Liquidity pricing curve.
-            UD60x18 a = convert(1) - p_lo_sqrt / p_hi_sqrt;
-            UD60x18 b = M / p_hi_sqrt + E * p_lo_sqrt;
-            UD60x18 c = M * E;
-
-            return (b + sqrt(powu(b, 2) + convert(4) * a * c)) / (convert(2) * a);
-        }
-    }
-
-    /**
-     * @dev Returns the amount of virtual MTokens in the market given the market liquidity and the pool price range.
-     * @param liquidity_ The liquidity of the market.
-     * @param poolPriceSqrtRange_ The range of possible pool prices, expressed as the square root of the pool price.
-     * @return The amount of virtual MTokens in the market.
-     */
-    function _calculateMVirtual(UD60x18 liquidity_, Range storage poolPriceSqrtRange_) internal view returns (uint256) {
-        if (liquidity_ == convert(0) || poolPriceSqrtRange_.isMinUnbounded) {
-            return 0;
-        } else {
-            return (liquidity_ * ud(poolPriceSqrtRange_.min)).UDToTok(_MToken);
+            // Pool price is unbounded. Use the Constant Product pricing curve.
+            return Math.sqrt(E * M);
         }
     }
 
     /**
      * @dev Returns the amount of virtual ETokens in the market given the market liquidity and the pool price range.
      * @param liquidity_ The liquidity of the market.
-     * @param poolPriceSqrtRange_ The range of possible pool prices, expressed as the square root of the pool price.
+     * @param poolPriceSqrtRangeX18_ The range of possible pool prices, expressed as the square root of the pool price.
      * @return The amount of virtual ETokens in the market.
      */
-    function _calculateEVirtual(UD60x18 liquidity_, Range storage poolPriceSqrtRange_) internal view returns (uint256) {
-        if (liquidity_ == convert(0) || poolPriceSqrtRange_.isMaxUnbounded) {
+    function _calculateEVirtual(uint256 liquidity_, Range storage poolPriceSqrtRangeX18_)
+        internal
+        view
+        returns (uint256)
+    {
+        if (liquidity_ == 0 || !poolPriceSqrtRangeX18_.isMaxBounded) {
             return 0;
         } else {
-            return (liquidity_ / ud(poolPriceSqrtRange_.max)).UDToTok(_EToken);
+            return liquidity_ * 1e18 / poolPriceSqrtRangeX18_.max;
+        }
+    }
+
+    /**
+     * @dev Returns the amount of virtual MTokens in the market given the market liquidity and the pool price range.
+     * @param liquidity_ The liquidity of the market.
+     * @param poolPriceSqrtRangeX18_ The range of possible pool prices, expressed as the square root of the pool price.
+     * @return The amount of virtual MTokens in the market.
+     */
+    function _calculateMVirtual(uint256 liquidity_, Range storage poolPriceSqrtRangeX18_)
+        internal
+        view
+        returns (uint256)
+    {
+        if (liquidity_ == 0 || !poolPriceSqrtRangeX18_.isMinBounded) {
+            return 0;
+        } else {
+            return liquidity_ * poolPriceSqrtRangeX18_.min / 1e18;
         }
     }
 
     /**
      * @dev Returns the MToken per EToken price of energy given an amount of MTokens and ETokens.
-     * @param MAmount The amount of MTokens.
      * @param EAmount The amount of ETokens.
+     * @param MAmount The amount of MTokens.
      * @return The price of energy.
      */
-    function _calculatePrice(uint256 MAmount, uint256 EAmount) internal view returns (UD60x18) {
-        UD60x18 M = MAmount.tokToUD(_MToken);
-        UD60x18 E = EAmount.tokToUD(_EToken);
+    function _calculatePrice(uint256 EAmount, uint256 MAmount) internal pure returns (UD60x18) {
+        uint256 E = EAmount;
+        uint256 M = MAmount;
 
-        if (M == convert(0) || E == convert(0)) {
+        if (E == 0 || M == 0) {
             return convert(0);
         } else {
-            return M / E;
+            return ud(M * 1e18 / E);
         }
-    }
-
-    /**
-     * @inheritdoc IEnergyAMM
-     */
-    function MToken() external view returns (IERC20) {
-        return _MToken;
     }
 
     /**
@@ -230,15 +231,15 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function LToken() external view returns (IERC20) {
-        return _LToken;
+    function MToken() external view returns (IERC20) {
+        return _MToken;
     }
 
     /**
      * @inheritdoc IEnergyAMM
      */
-    function MReserve() external view returns (uint256) {
-        return _MToken.balanceOf(address(this));
+    function LToken() external view returns (IERC20) {
+        return _LToken;
     }
 
     /**
@@ -251,66 +252,63 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function poolPriceRange() external view returns (Range memory) {
-        Range memory range;
-        range.min = powu(ud(_poolPriceSqrtRange.min), 2).unwrap();
-        range.max = powu(ud(_poolPriceSqrtRange.max), 2).unwrap();
-        range.isMinUnbounded = _poolPriceSqrtRange.isMinUnbounded;
-        range.isMaxUnbounded = _poolPriceSqrtRange.isMaxUnbounded;
+    function MReserve() external view returns (uint256) {
+        return _MToken.balanceOf(address(this));
+    }
 
-        return range;
+    /**
+     * @inheritdoc IEnergyAMM
+     */
+    function poolPriceRange() external view returns (Range memory) {
+        return _poolPriceRangeX18;
     }
 
     /**
      * @inheritdoc IEnergyAMM
      */
     function poolPrice() external view returns (UD60x18) {
-        return _calculatePrice(this.MReserve() + _MVirtual, this.EReserve() + _EVirtual);
+        return _calculatePrice(this.EReserve() + _EVirtual, this.MReserve() + _MVirtual);
     }
 
     /**
      * @inheritdoc IEnergyAMM
      */
-    function bidRange() external view returns (Range memory range) {
-        Range memory absoluteRange;
-        absoluteRange.min = 0;
-        absoluteRange.max = this.EReserve();
-        absoluteRange.isMinUnbounded = false;
-        absoluteRange.isMaxUnbounded = false;
-
-        return absoluteRange.intersect(_bidRange);
+    function bidRange() external view returns (Range memory) {
+        if (this.EReserve() == 0) {
+            return Range(1, 0, true, true);
+        } else {
+            return Range(0, this.EReserve(), false, true);
+        }
     }
 
     /**
      * @inheritdoc IEnergyAMM
      */
     function askRange() external view returns (Range memory) {
-        Range memory absoluteRange;
-        absoluteRange.min = 0;
-        if (_MVirtual.tokToUD(_MToken) == convert(0)) {
-            absoluteRange.max = 0;
+        if (_MVirtual == 0) {
+            return Range(1, 0, false, false);
         } else {
-            absoluteRange.max = (powu(_liquidity, 2) / _MVirtual.tokToUD(_MToken)
-                    - (this.EReserve() + _EVirtual).tokToUD(_EToken))
-            .UDToTok(_EToken);
+            if (this.EReserve() + _EVirtual > _liquidity ** 2 / _MVirtual) {
+                return Range(0, 0, true, true);
+            } else {
+                return Range(0, _liquidity ** 2 / _MVirtual - (this.EReserve() + _EVirtual), false, true);
+            }
         }
-        absoluteRange.isMinUnbounded = false;
-        absoluteRange.isMaxUnbounded = false;
-
-        return absoluteRange.intersect(_askRange);
     }
 
     /**
      * @inheritdoc IEnergyAMM
      */
-    function bidSwap(uint256 EAmount) external view returns (uint256 MSwap, uint256 ESwap) {
+    function bidSwap(uint256 EAmount) external view returns (uint256 ESwap, uint256 MSwap) {
         Range memory bidRange_ = this.bidRange();
         if (!bidRange_.contains(EAmount)) {
             revert OutsideRange(bidRange_, EAmount);
         }
 
         uint256 EReserveNew = this.EReserve() + _EVirtual - EAmount;
-        uint256 MReserveNew = (powu(_liquidity, 2) / EReserveNew.tokToUD(_EToken)).UDToTok(_MToken);
+        uint256 MReserveNew = _liquidity ** 2 / EReserveNew;
+
+        ESwap = EAmount;
 
         if ((this.MReserve() + _MVirtual) > MReserveNew) {
             MSwap = 0;
@@ -318,31 +316,37 @@ contract EnergyAMM is Ownable, IEnergyAMM {
             MSwap = MReserveNew - (this.MReserve() + _MVirtual);
         }
 
-        if (EReserveNew > (this.EReserve() + _EVirtual)) {
-            ESwap = 0;
-        } else {
-            ESwap = (this.EReserve() + _EVirtual) - EReserveNew;
+        if (ESwap == 0) {
+            MSwap = 0;
         }
-
         if (MSwap == 0) {
             ESwap = 0;
         }
-        if (ESwap == 0) {
-            MSwap = 0;
+
+        if (ESwap != 0 && MSwap != 0) {
+            UD60x18 price = _calculatePrice(ESwap, MSwap);
+
+            if (_poolPriceRangeX18.isMinBounded && price <= ud(_poolPriceRangeX18.min)) {
+                ESwap = MSwap * 1e18 / _poolPriceRangeX18.min;
+            } else if (_poolPriceRangeX18.isMaxBounded && price >= ud(_poolPriceRangeX18.max)) {
+                MSwap = ESwap * _poolPriceRangeX18.max / 1e18;
+            }
         }
     }
 
     /**
      * @inheritdoc IEnergyAMM
      */
-    function askSwap(uint256 EAmount) external view returns (uint256 MSwap, uint256 ESwap) {
+    function askSwap(uint256 EAmount) external view returns (uint256 ESwap, uint256 MSwap) {
         Range memory askRange_ = this.askRange();
         if (!askRange_.contains(EAmount)) {
             revert OutsideRange(askRange_, EAmount);
         }
 
         uint256 EReserveNew = this.EReserve() + _EVirtual + EAmount;
-        uint256 MReserveNew = (powu(_liquidity, 2) / EReserveNew.tokToUD(_EToken)).UDToTok(_MToken);
+        uint256 MReserveNew = _liquidity ** 2 / EReserveNew;
+
+        ESwap = EAmount;
 
         if (MReserveNew > (this.MReserve() + _MVirtual)) {
             MSwap = 0;
@@ -350,17 +354,21 @@ contract EnergyAMM is Ownable, IEnergyAMM {
             MSwap = (this.MReserve() + _MVirtual) - MReserveNew;
         }
 
-        if ((this.EReserve() + _EVirtual) > EReserveNew) {
-            ESwap = 0;
-        } else {
-            ESwap = EReserveNew - (this.EReserve() + _EVirtual);
+        if (ESwap == 0) {
+            MSwap = 0;
         }
-
         if (MSwap == 0) {
             ESwap = 0;
         }
-        if (ESwap == 0) {
-            MSwap = 0;
+
+        if (ESwap != 0 && MSwap != 0) {
+            UD60x18 price = _calculatePrice(ESwap, MSwap);
+
+            if (_poolPriceRangeX18.isMinBounded && price <= ud(_poolPriceRangeX18.min)) {
+                ESwap = MSwap * 1e18 / _poolPriceRangeX18.min;
+            } else if (_poolPriceRangeX18.isMaxBounded && price >= ud(_poolPriceRangeX18.max)) {
+                MSwap = ESwap * _poolPriceRangeX18.max / 1e18;
+            }
         }
     }
 
@@ -370,7 +378,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     function bidFee(uint256 EAmount) external view returns (uint256) {
         (uint256 MSwap,) = this.bidSwap(EAmount);
 
-        return (MSwap.tokToUD(_MToken) * feeRate).UDToTok(_MToken);
+        return MSwap * feeRate.unwrap() / 1e18;
     }
 
     /**
@@ -379,7 +387,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     function askFee(uint256 EAmount) external view returns (uint256) {
         (uint256 MSwap,) = this.askSwap(EAmount);
 
-        (uint256 MSwapWithoutFee,) = this.askSwap((EAmount.tokToUD(_EToken) * (convert(1) - feeRate)).UDToTok(_EToken));
+        (uint256 MSwapWithoutFee,) = this.askSwap(EAmount * (convert(1) - feeRate).unwrap() / 1e18);
 
         return MSwap - MSwapWithoutFee;
     }
@@ -388,18 +396,18 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @inheritdoc IEnergyAMM
      */
     function bidPrice(uint256 EAmount) external view returns (UD60x18) {
-        (uint256 MSwap, uint256 ESwap) = this.bidSwap(EAmount);
+        (uint256 ESwap, uint256 MSwap) = this.bidSwap(EAmount);
 
-        return _calculatePrice(MSwap, ESwap);
+        return _calculatePrice(ESwap, MSwap);
     }
 
     /**
      * @inheritdoc IEnergyAMM
      */
     function askPrice(uint256 EAmount) external view returns (UD60x18) {
-        (uint256 MSwap, uint256 ESwap) = this.askSwap(EAmount);
+        (uint256 ESwap, uint256 MSwap) = this.askSwap(EAmount);
 
-        return _calculatePrice(MSwap, ESwap);
+        return _calculatePrice(ESwap, MSwap);
     }
 
     /**
@@ -426,16 +434,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     {
         MLiq = MAmount;
         ELiq = EAmount;
-
-        UD60x18 price = MLiq.tokToUD(_MToken) / ELiq.tokToUD(_EToken);
-
-        if (!_poolPriceSqrtRange.isMinUnbounded && price < powu(ud(_poolPriceSqrtRange.min), 2)) {
-            ELiq = (MLiq.tokToUD(_MToken) / powu(ud(_poolPriceSqrtRange.min), 2)).UDToTok(_EToken);
-        } else if (!_poolPriceSqrtRange.isMaxUnbounded && price > powu(ud(_poolPriceSqrtRange.max), 2)) {
-            MLiq = (ELiq.tokToUD(_EToken) * powu(ud(_poolPriceSqrtRange.max), 2)).UDToTok(_MToken);
-        }
-
-        LShare = sqrt(MLiq.tokToUD(_MToken) * ELiq.tokToUD(_EToken)).UDToTok(_LToken);
+        LShare = Math.sqrt(MLiq * ELiq);
 
         if (MLiq == 0) {
             ELiq = 0;
@@ -455,18 +454,16 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @inheritdoc IEnergyAMM
      */
     function liquidityReduction(uint256 LAmount) external view returns (uint256 LShare, uint256 MLiq, uint256 ELiq) {
-        uint256 MShare = (_liquidityProportion(msg.sender) * this.MReserve().tokToUD(_MToken)).UDToTok(_MToken);
-        uint256 EShare = (_liquidityProportion(msg.sender) * this.EReserve().tokToUD(_EToken)).UDToTok(_EToken);
+        uint256 MShare = convert(convert(this.MReserve()) * _liquidityProportion(msg.sender));
+        uint256 EShare = convert(convert(this.EReserve()) * _liquidityProportion(msg.sender));
 
         if (LAmount > _LToken.balanceOf(msg.sender)) {
             LAmount = _LToken.balanceOf(msg.sender);
         }
 
         if (LAmount != 0) {
-            MLiq = (MShare.tokToUD(_MToken) * LAmount.tokToUD(_LToken) / _LToken.balanceOf(msg.sender).tokToUD(_LToken))
-            .UDToTok(_MToken);
-            ELiq = (EShare.tokToUD(_EToken) * LAmount.tokToUD(_LToken) / _LToken.balanceOf(msg.sender).tokToUD(_LToken))
-            .UDToTok(_EToken);
+            MLiq = (convert(MShare) * convert(LAmount) / convert(_LToken.balanceOf(msg.sender))).intoUint256();
+            ELiq = (convert(EShare) * convert(LAmount) / convert(_LToken.balanceOf(msg.sender))).intoUint256();
         }
         LShare = LAmount;
 
@@ -490,10 +487,10 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @return The proportion of liquidity.
      */
     function _liquidityProportion(address provider) internal view returns (UD60x18) {
-        if (_LToken.totalSupply().tokToUD(_LToken) == convert(0)) {
+        if (_LToken.totalSupply() == 0) {
             return convert(0);
         }
-        return _LToken.balanceOf(provider).tokToUD(_LToken) / _LToken.totalSupply().tokToUD(_LToken);
+        return convert(_LToken.balanceOf(provider)) / convert(_LToken.totalSupply());
     }
 
     /**
@@ -516,8 +513,8 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         info.trader = msg.sender;
         info.op = "buy";
-        info.MAmount = MSwap;
         info.EAmount = ESwap;
+        info.MAmount = MSwap;
         info.fee = MFee;
         info.poolPrice = this.poolPrice();
         info.tradePrice = this.bidPrice(EAmount);
@@ -546,8 +543,8 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         info.trader = msg.sender;
         info.op = "sell";
-        info.MAmount = MSwap;
         info.EAmount = ESwap;
+        info.MAmount = MSwap;
         info.fee = MFee;
         info.poolPrice = this.poolPrice();
         info.tradePrice = this.askPrice(EAmount);
@@ -566,34 +563,34 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function addLiquidity(uint256 MAmount, uint256 EAmount)
+    function addLiquidity(uint256 EAmount, uint256 MAmount)
         external
         liquidityShift
         returns (LiquidityInfo memory info)
     {
-        (uint256 LShare, uint256 MLiq, uint256 ELiq) = this.liquidityProvision(MAmount, EAmount);
-        if (LShare == 0 || MLiq == 0 || ELiq == 0) {
+        (uint256 LShare, uint256 ELiq, uint256 MLiq) = this.liquidityProvision(EAmount, MAmount);
+        if (LShare == 0 || ELiq == 0 || MLiq == 0) {
             revert ZeroTransfer();
         }
 
         info.provider = msg.sender;
         info.op = "addition";
-        info.MLiq = MLiq;
         info.ELiq = ELiq;
+        info.MLiq = MLiq;
         info.LShare = LShare;
         info.poolPrice = this.poolPrice();
-        info.liqPrice = MLiq.tokToUD(_MToken) / ELiq.tokToUD(_EToken);
+        info.liqPrice = convert(MLiq) / convert(ELiq);
 
-        uint256 MAllowance = _MToken.allowance(msg.sender, address(this));
         uint256 EAllowance = _EToken.allowance(msg.sender, address(this));
-        if (MAllowance < MLiq) {
-            revert InsufficientAllowance(IERC20(_MToken), MLiq, MAllowance);
-        }
+        uint256 MAllowance = _MToken.allowance(msg.sender, address(this));
         if (EAllowance < ELiq) {
             revert InsufficientAllowance(IERC20(_EToken), ELiq, EAllowance);
         }
-        require(_MToken.transferFrom(msg.sender, address(this), MLiq));
+        if (MAllowance < MLiq) {
+            revert InsufficientAllowance(IERC20(_MToken), MLiq, MAllowance);
+        }
         require(_EToken.transferFrom(msg.sender, address(this), ELiq));
+        require(_MToken.transferFrom(msg.sender, address(this), MLiq));
 
         _LToken.mint(msg.sender, LShare);
 
@@ -604,21 +601,21 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @inheritdoc IEnergyAMM
      */
     function removeLiquidity(uint256 LAmount) external liquidityShift returns (LiquidityInfo memory info) {
-        (uint256 LShare, uint256 MLiq, uint256 ELiq) = this.liquidityReduction(LAmount);
-        if (LShare == 0 || MLiq == 0 || ELiq == 0) {
+        (uint256 LShare, uint256 ELiq, uint256 MLiq) = this.liquidityReduction(LAmount);
+        if (LShare == 0 || ELiq == 0 || MLiq == 0) {
             revert ZeroTransfer();
         }
 
         info.provider = msg.sender;
         info.op = "removal";
-        info.MLiq = MLiq;
         info.ELiq = ELiq;
+        info.MLiq = MLiq;
         info.LShare = LShare;
         info.poolPrice = this.poolPrice();
-        info.liqPrice = MLiq.tokToUD(_MToken) / ELiq.tokToUD(_EToken);
+        info.liqPrice = convert(MLiq) / convert(ELiq);
 
-        require(_MToken.transfer(msg.sender, MLiq));
         require(_EToken.transfer(msg.sender, ELiq));
+        require(_MToken.transfer(msg.sender, MLiq));
         _LToken.burn(msg.sender, LShare);
 
         emit MarketStateChanged();
@@ -631,10 +628,17 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         if (!range.isValid()) {
             revert InvalidRange(range);
         }
-        _poolPriceSqrtRange.min = sqrt(ud(range.min)).unwrap();
-        _poolPriceSqrtRange.max = sqrt(ud(range.max)).unwrap();
-        _poolPriceSqrtRange.isMinUnbounded = range.isMinUnbounded;
-        _poolPriceSqrtRange.isMaxUnbounded = range.isMaxUnbounded;
+
+        _poolPriceRangeX18 = range;
+
+        _poolPriceSqrtRangeX18.isMinBounded = range.isMinBounded;
+        _poolPriceSqrtRangeX18.isMaxBounded = range.isMaxBounded;
+        if (_poolPriceSqrtRangeX18.isMinBounded) {
+            _poolPriceSqrtRangeX18.min = sqrt(ud(range.min)).unwrap();
+        }
+        if (_poolPriceSqrtRangeX18.isMaxBounded) {
+            _poolPriceSqrtRangeX18.max = sqrt(ud(range.max)).unwrap();
+        }
     }
 
     /**
@@ -642,25 +646,5 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      */
     function setFeeRate(UD60x18 feeRate_) external onlyOwner {
         feeRate = feeRate_;
-    }
-
-    /**
-     * @inheritdoc IEnergyAMM
-     */
-    function setBidRange(Range calldata range) external onlyOwner {
-        if (!range.isValid()) {
-            revert InvalidRange(range);
-        }
-        _bidRange = range;
-    }
-
-    /**
-     * @inheritdoc IEnergyAMM
-     */
-    function setAskRange(Range calldata range) external onlyOwner {
-        if (!range.isValid()) {
-            revert InvalidRange(range);
-        }
-        _askRange = range;
     }
 }
