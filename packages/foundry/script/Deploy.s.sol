@@ -1,6 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import "./DeployEnergyAMM.s.sol";
 import "./DeployHelpers.s.sol";
 
 /**
@@ -17,5 +18,7 @@ contract DeployScript is ScaffoldETHDeploy {
         // Deploy another contract
         // DeployMyContract myContract = new DeployMyContract();
         // myContract.run();
+
+        new DeployEnergyAMM().run();
     }
 }
