@@ -210,10 +210,11 @@ interface IEnergyAMM {
     function liquidityReduction(uint256 LAmount) external view returns (uint256 LShare, uint256 ELiq, uint256 MLiq);
 
     /**
-     * @notice Returns the proportion of liquidity shares that the sender holds.
-     * @return The sender's proportion of liquidity.
+     * @notice Returns the proportion of liquidity shares that a liquidity provider holds.
+     * @param provider The address of the liquidity provider.
+     * @return The provider's proportion of liquidity.
      */
-    function liquidityProportion() external view returns (UD60x18);
+    function liquidityProportion(address provider) external view returns (UD60x18);
 
     /**
      * @notice Executes a market swap to buy ETokens. The requested amount of ETokens will be transferred from the

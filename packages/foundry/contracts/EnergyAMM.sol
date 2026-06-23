@@ -454,8 +454,8 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @inheritdoc IEnergyAMM
      */
     function liquidityReduction(uint256 LAmount) external view returns (uint256 LShare, uint256 ELiq, uint256 MLiq) {
-        uint256 EShare = this.EReserve() * _liquidityProportion(msg.sender).unwrap() / 1e18;
-        uint256 MShare = this.MReserve() * _liquidityProportion(msg.sender).unwrap() / 1e18;
+        uint256 EShare = this.EReserve() * this.liquidityProportion(msg.sender).unwrap() / 1e18;
+        uint256 MShare = this.MReserve() * this.liquidityProportion(msg.sender).unwrap() / 1e18;
 
         if (LAmount > _LToken.balanceOf(msg.sender)) {
             LAmount = _LToken.balanceOf(msg.sender);
@@ -482,22 +482,13 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     }
 
     /**
-     * @dev Returns the proportion of liquidity owned by a liquidity provider.
-     * @param provider The address of a liquidity provider.
-     * @return The proportion of liquidity.
+     * @inheritdoc IEnergyAMM
      */
-    function _liquidityProportion(address provider) internal view returns (UD60x18) {
+    function liquidityProportion(address provider) external view returns (UD60x18) {
         if (_LToken.totalSupply() == 0) {
             return ud(0);
         }
         return ud(_LToken.balanceOf(provider) * 1e18 / _LToken.totalSupply());
-    }
-
-    /**
-     * @inheritdoc IEnergyAMM
-     */
-    function liquidityProportion() external view returns (UD60x18) {
-        return _liquidityProportion(msg.sender);
     }
 
     /**
