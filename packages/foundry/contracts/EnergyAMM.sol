@@ -146,20 +146,20 @@ contract EnergyAMM is Ownable, IEnergyAMM {
                 uint256 v2 = M * 1e18 / pHiS.unwrap();
                 uint256 b1 = v1 + v2;
                 uint256 b2 = v1 > v2 ? v1 - v2 : v2 - v1;
-                uint256 c = M * E;
+                uint256 c = E * M;
 
                 return (b1 + Math.sqrt(b2 ** 2 + 4 * c)) * 1e18 / (2 * a.unwrap());
             }
         } else if (poolPriceSqrtRangeX18_.isMinBounded) {
             // Pool price is bounded on only the low side. Use a partial Concentrated Liquidity pricing curve.
             uint256 b = E * pLoS.unwrap() / 1e18;
-            uint256 c = M * E;
+            uint256 c = E * M;
 
             return (b + Math.sqrt(b ** 2 + 4 * c)) / 2;
         } else if (poolPriceSqrtRangeX18_.isMaxBounded) {
             // Pool price is bounded on only the high side. Use a partial Concentrated Liquidity pricing curve.
             uint256 b = M * 1e18 / pHiS.unwrap();
-            uint256 c = M * E;
+            uint256 c = E * M;
 
             return (b + Math.sqrt(b ** 2 + 4 * c)) / 2;
         } else {
@@ -376,7 +376,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @inheritdoc IEnergyAMM
      */
     function bidFee(uint256 EAmount) external view returns (uint256) {
-        (uint256 MSwap,) = this.bidSwap(EAmount);
+        (, uint256 MSwap) = this.bidSwap(EAmount);
 
         return MSwap * feeRate.unwrap() / 1e18;
     }
@@ -385,9 +385,9 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @inheritdoc IEnergyAMM
      */
     function askFee(uint256 EAmount) external view returns (uint256) {
-        (uint256 MSwap,) = this.askSwap(EAmount);
+        (, uint256 MSwap) = this.askSwap(EAmount);
 
-        (uint256 MSwapWithoutFee,) = this.askSwap(EAmount * (convert(1) - feeRate).unwrap() / 1e18);
+        (, uint256 MSwapWithoutFee) = this.askSwap(EAmount * (convert(1) - feeRate).unwrap() / 1e18);
 
         return MSwap - MSwapWithoutFee;
     }
@@ -427,14 +427,14 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function liquidityProvision(uint256 MAmount, uint256 EAmount)
+    function liquidityProvision(uint256 EAmount, uint256 MAmount)
         external
         view
-        returns (uint256 LShare, uint256 MLiq, uint256 ELiq)
+        returns (uint256 LShare, uint256 ELiq, uint256 MLiq)
     {
         MLiq = MAmount;
         ELiq = EAmount;
-        LShare = Math.sqrt(MLiq * ELiq);
+        LShare = Math.sqrt(ELiq * MLiq);
 
         if (MLiq == 0) {
             ELiq = 0;
@@ -453,26 +453,26 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function liquidityReduction(uint256 LAmount) external view returns (uint256 LShare, uint256 MLiq, uint256 ELiq) {
-        uint256 MShare = convert(convert(this.MReserve()) * _liquidityProportion(msg.sender));
-        uint256 EShare = convert(convert(this.EReserve()) * _liquidityProportion(msg.sender));
+    function liquidityReduction(uint256 LAmount) external view returns (uint256 LShare, uint256 ELiq, uint256 MLiq) {
+        uint256 EShare = this.EReserve() * _liquidityProportion(msg.sender).unwrap() / 1e18;
+        uint256 MShare = this.MReserve() * _liquidityProportion(msg.sender).unwrap() / 1e18;
 
         if (LAmount > _LToken.balanceOf(msg.sender)) {
             LAmount = _LToken.balanceOf(msg.sender);
         }
 
         if (LAmount != 0) {
-            MLiq = (convert(MShare) * convert(LAmount) / convert(_LToken.balanceOf(msg.sender))).intoUint256();
-            ELiq = (convert(EShare) * convert(LAmount) / convert(_LToken.balanceOf(msg.sender))).intoUint256();
+            ELiq = EShare * LAmount * 1e18 / _LToken.balanceOf(msg.sender);
+            MLiq = MShare * LAmount * 1e18 / _LToken.balanceOf(msg.sender);
         }
         LShare = LAmount;
 
-        if (MLiq == 0) {
-            ELiq = 0;
-            LShare = 0;
-        }
         if (ELiq == 0) {
             MLiq = 0;
+            LShare = 0;
+        }
+        if (MLiq == 0) {
+            ELiq = 0;
             LShare = 0;
         }
         if (LShare == 0) {
@@ -488,9 +488,9 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      */
     function _liquidityProportion(address provider) internal view returns (UD60x18) {
         if (_LToken.totalSupply() == 0) {
-            return convert(0);
+            return ud(0);
         }
-        return convert(_LToken.balanceOf(provider)) / convert(_LToken.totalSupply());
+        return ud(_LToken.balanceOf(provider) * 1e18 / _LToken.totalSupply());
     }
 
     /**
@@ -504,7 +504,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @inheritdoc IEnergyAMM
      */
     function buy(uint256 EAmount) external liquidityShift returns (TradeInfo memory info) {
-        (uint256 MSwap, uint256 ESwap) = this.bidSwap(EAmount);
+        (uint256 ESwap, uint256 MSwap) = this.bidSwap(EAmount);
         uint256 MFee = this.bidFee(EAmount);
 
         if (MSwap == 0 || ESwap == 0) {
@@ -534,10 +534,10 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @inheritdoc IEnergyAMM
      */
     function sell(uint256 EAmount) external liquidityShift returns (TradeInfo memory info) {
-        (uint256 MSwap, uint256 ESwap) = this.askSwap(EAmount);
+        (uint256 ESwap, uint256 MSwap) = this.askSwap(EAmount);
         uint256 MFee = this.askFee(EAmount);
 
-        if (MSwap == 0 || ESwap == 0) {
+        if (ESwap == 0 || MSwap == 0) {
             revert ZeroTransfer();
         }
 
