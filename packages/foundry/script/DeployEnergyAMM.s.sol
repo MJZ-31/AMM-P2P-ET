@@ -30,17 +30,17 @@ contract DeployEnergyAMM is ScaffoldETHDeploy {
      *      - Export contract addresses & ABIs to `nextjs` packages
      */
     function run() external ScaffoldEthDeployerRunner {
-        MToken mToken = new MToken();
         EToken eToken = new EToken();
-        EnergyAMM AMM = new EnergyAMM(IERC20Metadata(mToken), IERC20Metadata(eToken));
+        MToken mToken = new MToken();
+        EnergyAMM AMM = new EnergyAMM(IERC20Metadata(eToken), IERC20Metadata(mToken));
 
         AMM.setPoolPriceRange(Range(0.5e18, 2e18, false, false));
         AMM.setFeeRate(ud(0.01e18));
 
         address user = 0x582dbea045e68002e57bab00f02d9ea38d54F52d;
 
-        mToken.mint(user, 1e25);
         eToken.mint(user, 1e25);
+        mToken.mint(user, 1e25);
         AMM.transferOwnership(user);
     }
 }
