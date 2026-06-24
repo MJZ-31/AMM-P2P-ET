@@ -316,13 +316,6 @@ contract EnergyAMM is Ownable, IEnergyAMM {
             MSwap = MReserveNew - (this.MReserve() + _MVirtual);
         }
 
-        if (ESwap == 0) {
-            MSwap = 0;
-        }
-        if (MSwap == 0) {
-            ESwap = 0;
-        }
-
         if (ESwap != 0 && MSwap != 0) {
             UD60x18 price = _calculatePrice(ESwap, MSwap);
 
@@ -331,6 +324,13 @@ contract EnergyAMM is Ownable, IEnergyAMM {
             } else if (_poolPriceRangeX18.isMaxBounded && price >= ud(_poolPriceRangeX18.max)) {
                 MSwap = ESwap * _poolPriceRangeX18.max / 1e18;
             }
+        }
+
+        if (ESwap == 0) {
+            MSwap = 0;
+        }
+        if (MSwap == 0) {
+            ESwap = 0;
         }
     }
 
@@ -354,13 +354,6 @@ contract EnergyAMM is Ownable, IEnergyAMM {
             MSwap = (this.MReserve() + _MVirtual) - MReserveNew;
         }
 
-        if (ESwap == 0) {
-            MSwap = 0;
-        }
-        if (MSwap == 0) {
-            ESwap = 0;
-        }
-
         if (ESwap != 0 && MSwap != 0) {
             UD60x18 price = _calculatePrice(ESwap, MSwap);
 
@@ -369,6 +362,13 @@ contract EnergyAMM is Ownable, IEnergyAMM {
             } else if (_poolPriceRangeX18.isMaxBounded && price >= ud(_poolPriceRangeX18.max)) {
                 MSwap = ESwap * _poolPriceRangeX18.max / 1e18;
             }
+        }
+
+        if (ESwap == 0) {
+            MSwap = 0;
+        }
+        if (MSwap == 0) {
+            ESwap = 0;
         }
     }
 
