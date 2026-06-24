@@ -5,5 +5,8 @@ services:
     ports:
       - "3306:3306"
       - "33060:33060"
+    command: --init-file /data/application/init.sql
+    volumes:
+      - ./init.sql:/data/application/init.sql:Z
     environment:
       MYSQL_ROOT_PASSWORD: admin
