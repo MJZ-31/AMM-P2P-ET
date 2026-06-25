@@ -387,7 +387,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     function askFee(uint256 EAmount) external view returns (uint256) {
         (, uint256 MSwap) = this.askSwap(EAmount);
 
-        (, uint256 MSwapWithoutFee) = this.askSwap(EAmount * (convert(1) - feeRate).unwrap() / 1e18);
+        (, uint256 MSwapWithoutFee) = this.askSwap(EAmount * 1e18 / (convert(1) + feeRate).unwrap());
 
         return MSwap - MSwapWithoutFee;
     }
