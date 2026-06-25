@@ -432,16 +432,20 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         view
         returns (uint256 LShare, uint256 ELiq, uint256 MLiq)
     {
+        uint256 EReserveNew = this.EReserve() + EAmount;
+        uint256 MReserveNew = this.MReserve() + MAmount;
+        uint256 liquidityNew = Math.sqrt(EReserveNew * MReserveNew);
+
         MLiq = MAmount;
         ELiq = EAmount;
-        LShare = Math.sqrt(ELiq * MLiq);
+        LShare = liquidityNew - _LToken.totalSupply();
 
-        if (MLiq == 0) {
-            ELiq = 0;
-            LShare = 0;
-        }
         if (ELiq == 0) {
             MLiq = 0;
+            LShare = 0;
+        }
+        if (MLiq == 0) {
+            ELiq = 0;
             LShare = 0;
         }
         if (LShare == 0) {
@@ -454,16 +458,16 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @inheritdoc IEnergyAMM
      */
     function liquidityReduction(uint256 LAmount) external view returns (uint256 LShare, uint256 ELiq, uint256 MLiq) {
-        uint256 EShare = this.EReserve() * this.liquidityProportion(msg.sender).unwrap() / 1e18;
-        uint256 MShare = this.MReserve() * this.liquidityProportion(msg.sender).unwrap() / 1e18;
-
         if (LAmount > _LToken.balanceOf(msg.sender)) {
             LAmount = _LToken.balanceOf(msg.sender);
         }
+        UD60x18 balanceProportion = ud(LAmount * 1e18 / _LToken.balanceOf(msg.sender));
+
+        UD60x18 proportion = this.liquidityProportion(msg.sender) * balanceProportion;
 
         if (LAmount != 0) {
-            ELiq = EShare * LAmount * 1e18 / _LToken.balanceOf(msg.sender);
-            MLiq = MShare * LAmount * 1e18 / _LToken.balanceOf(msg.sender);
+            ELiq = this.EReserve() * proportion.unwrap() / 1e18.
+            MLiq = this.MReserve() * proportion.unwrap() / 1e18.
         }
         LShare = LAmount;
 
