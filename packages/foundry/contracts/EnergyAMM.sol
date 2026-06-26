@@ -466,8 +466,8 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         UD60x18 proportion = this.liquidityProportion(msg.sender) * balanceProportion;
 
         if (LAmount != 0) {
-            ELiq = this.EReserve() * proportion.unwrap() / 1e18.
-            MLiq = this.MReserve() * proportion.unwrap() / 1e18.
+            ELiq = this.EReserve() * proportion.unwrap() / 1e18;
+            MLiq = this.MReserve() * proportion.unwrap() / 1e18;
         }
         LShare = LAmount;
 
