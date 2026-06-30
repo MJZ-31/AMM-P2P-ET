@@ -522,7 +522,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         require(_MToken.transferFrom(msg.sender, address(this), MSwap + MFee));
         require(_EToken.transfer(msg.sender, ESwap));
 
-        emit MarketStateChanged();
+        emit MarketStateChanged(this.poolPrice(), this.EReserve(), this.MReserve(), _LToken.totalSupply());
     }
 
     /**
@@ -552,7 +552,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         require(_MToken.transfer(msg.sender, MSwap - MFee));
         require(_EToken.transferFrom(msg.sender, address(this), ESwap));
 
-        emit MarketStateChanged();
+        emit MarketStateChanged(this.poolPrice(), this.EReserve(), this.MReserve(), _LToken.totalSupply());
     }
 
     /**
@@ -589,7 +589,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         _LToken.mint(msg.sender, LShare);
 
-        emit MarketStateChanged();
+        emit MarketStateChanged(this.poolPrice(), this.EReserve(), this.MReserve(), _LToken.totalSupply());
     }
 
     /**
@@ -613,7 +613,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         require(_MToken.transfer(msg.sender, MLiq));
         _LToken.burn(msg.sender, LShare);
 
-        emit MarketStateChanged();
+        emit MarketStateChanged(this.poolPrice(), this.EReserve(), this.MReserve(), _LToken.totalSupply());
     }
 
     /**

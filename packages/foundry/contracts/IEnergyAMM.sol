@@ -11,8 +11,12 @@ import { Range } from "./Range.sol";
 /**
  * @notice Emitted when the state of the market changes. This occurs on every buy, sell, or liquidity addition or
  * removal.
+ * @param poolPrice The current pool price.
+ * @param EReserve The current reserve of ETokens.
+ * @param MReserve The current reserve of MTokens.
+ * @param liquidity The current market liquidity.
  */
-event MarketStateChanged();
+event MarketStateChanged(UD60x18 poolPrice, uint256 EReserve, uint256 MReserve, uint256 liquidity);
 
 /**
  * @notice Thrown if an operation is attempted without the required allowance of an ERC20 token.
