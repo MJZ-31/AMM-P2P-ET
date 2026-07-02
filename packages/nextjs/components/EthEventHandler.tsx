@@ -11,10 +11,6 @@ const EthEventHandler = ({ children }: { children: React.ReactNode }) => {
         onLogs: (logs) => {
             logs.map((log) => {
                 const { poolPrice, EReserve, MReserve, liquidity } = log.args;
-                console.log("poolPrice:", poolPrice, "(", typeof poolPrice, ")");
-                console.log("EReserve:", EReserve, "(", typeof EReserve, ")");
-                console.log("MReserve:", MReserve, "(", typeof MReserve, ")");
-                console.log("liquidity:", liquidity, "(", typeof liquidity, ")");
                 try {
                     updateMarketHistory(
                         Number(poolPrice) / 1e18,
