@@ -22,7 +22,5 @@ export default async function readMarketHistory(startTimestamp: Date | undefined
             [startTimestamp, endTimestamp]);
     }
     connection.end();
-    console.log(rows);
-    console.log(fields);
     return rows;
 }
