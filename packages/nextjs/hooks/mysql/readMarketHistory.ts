@@ -1,3 +1,5 @@
+"use server";
+
 import { getDBSettings } from './getDBSettings';
 
 import mysql from 'mysql2/promise';
