@@ -49,9 +49,7 @@ export default function HistoryGraph(props: Props) {
 
     const options = {
       responsive: true,
-      interaction: {
-          mode: '',
-      },
+      aspectRatio: 1.5,
       layout: {
           autoPadding: false,
       },
@@ -93,43 +91,10 @@ export default function HistoryGraph(props: Props) {
       ],
     };
 
-    const boundLinesPlugin = {
-            id: 'boundLines',
-            afterDraw: (chart) => {
-                const ctx = chart.ctx;
-
-                if (props.poolPriceMin) {
-                    const yMin = chart.scales.y.getPixelForValue(props.poolPriceMin);
-
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.moveTo(chart.chartArea.left, yMin);
-                    ctx.lineTo(chart.chartArea.right, yMin);
-                    ctx.strokeStyle = 'pink';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                    ctx.restore();
-                }
-
-                if (props.poolPriceMax) {
-                    const yMax = chart.scales.y.getPixelForValue(props.poolPriceMax);
-
-                    ctx.beginPath();
-                    ctx.moveTo(chart.chartArea.left, yMax);
-                    ctx.lineTo(chart.chartArea.right, yMax);
-                    ctx.strokeStyle = 'pink';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                    ctx.restore();
-                }
-            }
-        };
-
     return (
         <Line
             options={options}
             data={data}
-            plugins={[boundLinesPlugin]}
         />
     );
 }
