@@ -39,13 +39,11 @@ const TradePage = () => {
 
     useEffect(() => {
         if (buyOrSell == "Buy") {
-            bidSwap.refetch();
             setMAmount(bidSwap?.data ? bidSwap.data[1] : undefined);
         } else if (buyOrSell == "Sell") {
-            askSwap.refetch();
             setMAmount(askSwap?.data ? askSwap.data[1] : undefined);
         }
-    }, [EAmount, buyOrSell]);
+    }, [bidSwap, askSwap, buyOrSell]);
 
     useEffect(() => {
         document.getElementById("MAmount-input").value = MAmount ? Number(MAmount) / 1e18 : "";
