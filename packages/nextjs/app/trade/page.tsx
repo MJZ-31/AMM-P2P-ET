@@ -1,51 +1,55 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWriteContract } from '~~/hooks/scaffold-eth'
+import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWriteContract } from '~~/hooks/scaffold-eth';
 
 const TradePage = () => {
     const [buyOrSell, setBuyOrSell] = useState("Buy");
-    const [EAmount, setEAmount] = useState(0);
+    const [EAmount, setEAmount] = useState();
+    const [MAmount, setMAmount] = useState();
 
     const bidSwap = useScaffoldReadContract({
         contractName: "EnergyAMM",
         functionName: "bidSwap",
         args: [EAmount],
         watch: true
-    }).data;
+    });
     
     const bidFee = useScaffoldReadContract({
         contractName: "EnergyAMM",
         functionName: "bidFee",
         args: [EAmount],
         watch: true
-    }).data;
-
-    const ESwapBid = bidSwap ? bidSwap[0] : undefined;
-    const MSwapBid = bidSwap ? bidSwap[1] : undefined;
+    });
 
     const askSwap = useScaffoldReadContract({
         contractName: "EnergyAMM",
         functionName: "askSwap",
         args: [EAmount],
         watch: true
-    }).data;
+    });
 
     const askFee = useScaffoldReadContract({
         contractName: "EnergyAMM",
         functionName: "askFee",
         args: [EAmount],
         watch: true
-    }).data;
+    });
 
-    const ESwapAsk = askSwap ? askSwap[0] : undefined;
-    const MSwapAsk = askSwap ? askSwap[1] : undefined;
+    useEffect(() => {
+        if (buyOrSell == "Buy") {
+            bidSwap.refetch();
+            setMAmount(bidSwap?.data ? bidSwap.data[1] : undefined);
+        } else if (buyOrSell == "Sell") {
+            askSwap.refetch();
+            setMAmount(askSwap?.data ? askSwap.data[1] : undefined);
+        }
+    }, [EAmount, buyOrSell]);
 
-    const ESwap = buyOrSell == "Buy" ? ESwapBid : ESwapAsk;
-    const MSwap = buyOrSell == "Buy" ? MSwapBid : MSwapAsk;
-
-    const fee = buyOrSell == "Buy" ? bidFee : askFee;
+    useEffect(() => {
+        document.getElementById("MAmount-input").value = MAmount ? Number(MAmount) / 1e18 : "";
+    }, [MAmount]);
 
     const { writeContractAsync: writeEnergyAMM } = useScaffoldWriteContract({ contractName: "EnergyAMM" });
     const { writeContractAsync: writeEToken } = useScaffoldWriteContract({ contractName: "EToken" });
@@ -56,18 +60,21 @@ const TradePage = () => {
     const confirm = async () => {
         try {
             if (buyOrSell == "Buy") {
+                bidSwap.refetch()
+                bidFee.refetch()
                 await writeMToken({
                     functionName: "approve",
-                    args: [EnergyAMMInfo.address, MSwap + fee]
+                    args: [EnergyAMMInfo.address, bidSwap?.data[1] + bidFee?.data]
                 });
                 await writeEnergyAMM({
                     functionName: "buy",
                     args: [EAmount]
                 });
             } else if (buyOrSell == "Sell") {
+                askSwap.refetch()
                 await writeEToken({
                     functionName: "approve",
-                    args: [EnergyAMMInfo.address, ESwap]
+                    args: [EnergyAMMInfo.address, askSwap?.data[0]]
                 });
                 await writeEnergyAMM({
                     functionName: "sell",
@@ -83,12 +90,12 @@ const TradePage = () => {
     return (
       <>
         <form action={confirm}>
-          <input type="text" id="EAmount-input" placeholder="0 kWh"
+          <input type="text" id="EAmount-input" placeholder="0" autoComplete="off"
             onChange={() => {
                 setEAmount(Math.floor(document.getElementById("EAmount-input").value * 1e18));
             }}
-          />
-          <input type="text" readOnly id="MAmount-input" placeholder="$ 0" value={"$ " + Number(MSwap) / 1e18}/>
+          /><label>kWh</label><br/>
+          <label>$</label><input type="text" readOnly id="MAmount-input" placeholder="0" autoComplete="off"/><br/>
           <input type="button" value={buyOrSell}
             onClick={() => {
                 if (buyOrSell == "Buy") {
@@ -97,7 +104,7 @@ const TradePage = () => {
                     setBuyOrSell("Buy");
                 }
             }}
-          /><br/>
+          />
           <input type="submit" value="Confirm"/>
         </form>
       </>
