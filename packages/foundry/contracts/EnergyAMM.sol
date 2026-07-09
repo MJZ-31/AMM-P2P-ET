@@ -434,7 +434,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     {
         uint256 EReserveNew = this.EReserve() + EAmount;
         uint256 MReserveNew = this.MReserve() + MAmount;
-        uint256 liquidityNew = Math.sqrt(EReserveNew * MReserveNew);
+        uint256 liquidityNew = Math.sqrt(EReserveNew) * Math.sqrt(MReserveNew);
 
         MLiq = MAmount;
         ELiq = EAmount;
@@ -461,7 +461,10 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         if (LAmount > _LToken.balanceOf(msg.sender)) {
             LAmount = _LToken.balanceOf(msg.sender);
         }
-        UD60x18 balanceProportion = ud(LAmount * 1e18 / _LToken.balanceOf(msg.sender));
+        UD60x18 balanceProportion = ud(0);
+        if (_LToken.balanceOf(msg.sender) != 0) {
+            balanceProportion = ud(LAmount * 1e18 / _LToken.balanceOf(msg.sender));
+        }
 
         UD60x18 proportion = this.liquidityProportion(msg.sender) * balanceProportion;
 
@@ -574,7 +577,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         info.MLiq = MLiq;
         info.LShare = LShare;
         info.poolPrice = this.poolPrice();
-        info.liqPrice = convert(MLiq) / convert(ELiq);
+        info.liqPrice = ud(MLiq * 1e18 / ELiq);
 
         uint256 EAllowance = _EToken.allowance(msg.sender, address(this));
         uint256 MAllowance = _MToken.allowance(msg.sender, address(this));
@@ -607,7 +610,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         info.MLiq = MLiq;
         info.LShare = LShare;
         info.poolPrice = this.poolPrice();
-        info.liqPrice = convert(MLiq) / convert(ELiq);
+        info.liqPrice = ud(MLiq * 1e18 / ELiq);
 
         require(_EToken.transfer(msg.sender, ELiq));
         require(_MToken.transfer(msg.sender, MLiq));
