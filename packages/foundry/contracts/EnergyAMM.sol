@@ -326,11 +326,9 @@ contract EnergyAMM is Ownable, IEnergyAMM {
             }
         }
 
-        if (ESwap == 0) {
-            MSwap = 0;
-        }
-        if (MSwap == 0) {
+        if (ESwap == 0 || MSwap == 0) {
             ESwap = 0;
+            MSwap = 0;
         }
     }
 
@@ -364,11 +362,9 @@ contract EnergyAMM is Ownable, IEnergyAMM {
             }
         }
 
-        if (ESwap == 0) {
-            MSwap = 0;
-        }
-        if (MSwap == 0) {
+        if (ESwap == 0 || MSwap == 0) {
             ESwap = 0;
+            MSwap = 0;
         }
     }
 
@@ -427,30 +423,24 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function liquidityProvision(uint256 EAmount, uint256 MAmount)
-        external
-        view
-        returns (uint256 LShare, uint256 ELiq, uint256 MLiq)
-    {
-        uint256 EReserveNew = this.EReserve() + EAmount;
-        uint256 MReserveNew = this.MReserve() + MAmount;
-        uint256 liquidityNew = Math.sqrt(EReserveNew) * Math.sqrt(MReserveNew);
+    function liquidityProvision(uint256 LAmount) external view returns (uint256 LShare, uint256 ELiq, uint256 MLiq) {
+        UD60x18 liqPrice = ud(1e18);
+        if (this.EReserve() != 0 && this.MReserve() != 0) {
+            liqPrice = ud(this.MReserve() * 1e18 / this.EReserve());
+        }
 
-        MLiq = MAmount;
-        ELiq = EAmount;
+        uint256 liquidityNew = _LToken.totalSupply() + LAmount;
+        uint256 EReserveNew = liquidityNew * 1e18 / sqrt(liqPrice).unwrap();
+        uint256 MReserveNew = EReserveNew * liqPrice.unwrap() / 1e18;
+
         LShare = liquidityNew - _LToken.totalSupply();
+        ELiq = EReserveNew - this.EReserve();
+        MLiq = MReserveNew - this.MReserve();
 
-        if (ELiq == 0) {
-            MLiq = 0;
+        if (LShare == 0 || ELiq == 0 || MLiq == 0) {
             LShare = 0;
-        }
-        if (MLiq == 0) {
             ELiq = 0;
-            LShare = 0;
-        }
-        if (LShare == 0) {
             MLiq = 0;
-            ELiq = 0;
         }
     }
 
@@ -461,30 +451,24 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         if (LAmount > _LToken.balanceOf(msg.sender)) {
             LAmount = _LToken.balanceOf(msg.sender);
         }
-        UD60x18 balanceProportion = ud(0);
-        if (_LToken.balanceOf(msg.sender) != 0) {
-            balanceProportion = ud(LAmount * 1e18 / _LToken.balanceOf(msg.sender));
+
+        UD60x18 liqPrice = ud(1e18);
+        if (this.EReserve() != 0 && this.MReserve() != 0) {
+            liqPrice = ud(this.MReserve() * 1e18 / this.EReserve());
         }
 
-        UD60x18 proportion = this.liquidityProportion(msg.sender) * balanceProportion;
+        uint256 liquidityNew = _LToken.totalSupply() - LAmount;
+        uint256 EReserveNew = liquidityNew * 1e18 / sqrt(liqPrice).unwrap();
+        uint256 MReserveNew = EReserveNew * liqPrice.unwrap() / 1e18;
 
-        if (LAmount != 0) {
-            ELiq = this.EReserve() * proportion.unwrap() / 1e18;
-            MLiq = this.MReserve() * proportion.unwrap() / 1e18;
-        }
-        LShare = LAmount;
+        LShare = _LToken.totalSupply() - liquidityNew;
+        ELiq = this.EReserve() - EReserveNew;
+        MLiq = this.MReserve() - MReserveNew;
 
-        if (ELiq == 0) {
-            MLiq = 0;
+        if (LShare == 0 || ELiq == 0 || MLiq == 0) {
             LShare = 0;
-        }
-        if (MLiq == 0) {
             ELiq = 0;
-            LShare = 0;
-        }
-        if (LShare == 0) {
             MLiq = 0;
-            ELiq = 0;
         }
     }
 
@@ -561,12 +545,8 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function addLiquidity(uint256 EAmount, uint256 MAmount)
-        external
-        liquidityShift
-        returns (LiquidityInfo memory info)
-    {
-        (uint256 LShare, uint256 ELiq, uint256 MLiq) = this.liquidityProvision(EAmount, MAmount);
+    function addLiquidity(uint256 LAmount) external liquidityShift returns (LiquidityInfo memory info) {
+        (uint256 LShare, uint256 ELiq, uint256 MLiq) = this.liquidityProvision(LAmount);
         if (LShare == 0 || ELiq == 0 || MLiq == 0) {
             revert ZeroTransfer();
         }
@@ -614,6 +594,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         require(_EToken.transfer(msg.sender, ELiq));
         require(_MToken.transfer(msg.sender, MLiq));
+
         _LToken.burn(msg.sender, LShare);
 
         emit MarketStateChanged(this.poolPrice(), this.EReserve(), this.MReserve(), _LToken.totalSupply());

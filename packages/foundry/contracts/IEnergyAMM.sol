@@ -189,17 +189,15 @@ interface IEnergyAMM {
     function askSlippage(uint256 EAmount) external view returns (SD59x18);
 
     /**
-     * @notice Returns the amount of LTokens rewarded for a liquidity addition and the amounts of MTokens and ETokens to
-     * add.
-     * @param EAmount The amount of ETokens being added to the liquidity pool.
-     * @param MAmount The amount of MTokens being added to the liquidity pool.
+     * @notice Returns the amount of MTokens and ETokens required to add a certain amount of liquidity to the market.
+     * @param LAmount The amount of liquidity being added to the market.
      * @return LShare The amount of LTokens that will be minted and transferred to the sender.
      * @return ELiq The amount of ETokens that will be transferred from the sender to the liquidity pool. This may be
      * lower than MAmount to keep the addition price point in the pool price range.
      * @return MLiq The amount of MTokens that will be transferred from the sender to the liquidity pool. This may be
      * lower than MAmount to keep the addition price point in the pool price range.
      */
-    function liquidityProvision(uint256 EAmount, uint256 MAmount)
+    function liquidityProvision(uint256 LAmount)
         external
         view
         returns (uint256 LShare, uint256 ELiq, uint256 MLiq);
@@ -241,13 +239,12 @@ interface IEnergyAMM {
     function sell(uint256 EAmount) external returns (TradeInfo memory);
 
     /**
-     * @notice Executes a liquidity addition. The desired amount of MTokens and ETokens will be transferred from the
+     * @notice Executes a liquidity addition. The required amount of MTokens and ETokens will be transferred from the
      * sender to the liquidity pool. A corresponding amount of LTokens will be minted and transferred to the sender.
-     * @param EAmount The amount of MTokens being added.
-     * @param MAmount The amount of ETokens being added.
+     * @param LAmount The amount of liquidity to add.
      * @return Information about the liquidity addition.
      */
-    function addLiquidity(uint256 EAmount, uint256 MAmount) external returns (LiquidityInfo memory);
+    function addLiquidity(uint256 LAmount) external returns (LiquidityInfo memory);
 
     /**
      * @notice Executes a liquidity removal. The desired amount of LTokens will be transferred from the sender and
