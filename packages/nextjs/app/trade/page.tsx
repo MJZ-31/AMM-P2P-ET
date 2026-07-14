@@ -79,22 +79,23 @@ const TradePage = () => {
                     args: [EAmount]
                 });
             }
+            setEAmount(0);
+            setMAmount(0);
         } catch (e) {
             console.error("Trade Confirm: ", e);
         }
-        setEAmount(0);
     }
 
     return (
       <>
         <form action={confirm}>
-          <input type="text" id="EAmount-input" placeholder="0" autoComplete="off"
+          <input id="EAmount-input" type="text" placeholder="0" autoComplete="off"
             onChange={() => {
                 setEAmount(Math.floor(document.getElementById("EAmount-input").value * 1e18));
             }}
           /><label>kWh</label><br/>
-          <label>$</label><input type="text" readOnly id="MAmount-input" placeholder="0" autoComplete="off"/><br/>
-          <input type="button" value={buyOrSell}
+          <label>$</label><input id="MAmount-input" type="text" readOnly placeholder="0"/><br/>
+          <input id="buyOrSell-button" type="button" value={buyOrSell}
             onClick={() => {
                 if (buyOrSell == "Buy") {
                     setBuyOrSell("Sell");
@@ -103,7 +104,7 @@ const TradePage = () => {
                 }
             }}
           />
-          <input type="submit" value="Confirm"/>
+          <input id="trade-confirm" type="submit" value="Confirm"/>
         </form>
       </>
     );
