@@ -1,0 +1,25 @@
+test:
+    name: EnergyAMM
+    description: Benchmark market transactions on EnergyAMM.
+    workers:
+        # number: 50
+        number: 1
+    rounds:
+    -   label: buy
+        # txNumber: 200
+        txNumber: 1
+        rateControl:
+            type: fixed-rate
+            opts:
+                tps: 10
+        workload:
+            module: buy.js
+    -   label: sell
+        # txNumber: 200
+        txNumber: 1
+        rateControl:
+            type: fixed-rate
+            opts:
+                tps: 10
+        workload:
+            module: sell.js

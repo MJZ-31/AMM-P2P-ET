@@ -1,0 +1,15 @@
+services:
+  caliper:
+    container_name: caliper
+    image: hyperledger/caliper:0.6.0
+    command: launch manager
+    environment:
+      - CALIPER_BIND_SUT=ethereum:1.3
+      - CALIPER_BENCHCONFIG=benchConfig.yaml
+      - CALIPER_NETWORKCONFIG=networkConfig.json
+      - CALIPER-FLOW-SKIP-INSTALL=true
+      - CALIPER_LOG_LEVEL=debug
+    volumes:
+      - .:/hyperledger/caliper/workspace:Z
+    network_mode: host
+    # env_file: .env
