@@ -431,7 +431,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         uint256 liquidityNew = _LToken.totalSupply() + LAmount;
         uint256 EReserveNew = liquidityNew * 1e18 / sqrt(liqPrice).unwrap();
-        uint256 MReserveNew = EReserveNew * liqPrice.unwrap() / 1e18;
+        uint256 MReserveNew = liquidityNew * sqrt(liqPrice).unwrap() / 1e18;
 
         LShare = liquidityNew - _LToken.totalSupply();
         ELiq = EReserveNew - this.EReserve();
@@ -459,7 +459,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         uint256 liquidityNew = _LToken.totalSupply() - LAmount;
         uint256 EReserveNew = liquidityNew * 1e18 / sqrt(liqPrice).unwrap();
-        uint256 MReserveNew = EReserveNew * liqPrice.unwrap() / 1e18;
+        uint256 MReserveNew = liquidityNew * sqrt(liqPrice).unwrap() / 1e18;
 
         LShare = _LToken.totalSupply() - liquidityNew;
         ELiq = this.EReserve() - EReserveNew;
