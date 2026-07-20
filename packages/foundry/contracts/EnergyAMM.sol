@@ -259,6 +259,13 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
+    function liquidity() external view returns (uint256) {
+        return _LToken.totalSupply();
+    }
+
+    /**
+     * @inheritdoc IEnergyAMM
+     */
     function poolPriceRange() external view returns (Range memory) {
         return _poolPriceRangeX18;
     }
@@ -424,18 +431,25 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @inheritdoc IEnergyAMM
      */
     function liquidityProvision(uint256 LAmount) external view returns (uint256 LShare, uint256 ELiq, uint256 MLiq) {
-        UD60x18 liqPrice = ud(1e18);
-        if (this.EReserve() != 0 && this.MReserve() != 0) {
-            liqPrice = ud(this.MReserve() * 1e18 / this.EReserve());
+        uint256 liquidityNew = this.liquidity() + LAmount;
+
+        uint256 EReserveNew = 0;
+        if (this.EReserve() == 0 || this.MReserve() == 0) {
+            EReserveNew = liquidityNew;
+        } else {
+            EReserveNew = liquidityNew * Math.sqrt(this.EReserve()) / Math.sqrt(this.MReserve());
         }
 
-        uint256 liquidityNew = _LToken.totalSupply() + LAmount;
-        uint256 EReserveNew = liquidityNew * 1e18 / sqrt(liqPrice).unwrap();
-        uint256 MReserveNew = liquidityNew * sqrt(liqPrice).unwrap() / 1e18;
+        uint256 MReserveNew = 0;
+        if (this.EReserve() == 0 || this.MReserve() == 0) {
+            MReserveNew = liquidityNew;
+        } else {
+            MReserveNew = liquidityNew * Math.sqrt(this.MReserve()) / Math.sqrt(this.EReserve());
+        }
 
-        LShare = liquidityNew - _LToken.totalSupply();
-        ELiq = EReserveNew - this.EReserve();
-        MLiq = MReserveNew - this.MReserve();
+        LShare = this.liquidity() > liquidityNew ? 0 : liquidityNew - this.liquidity();
+        ELiq = this.EReserve() > EReserveNew ? 0 : EReserveNew - this.EReserve();
+        MLiq = this.MReserve() > MReserveNew ? 0 : MReserveNew - this.MReserve();
 
         if (LShare == 0 || ELiq == 0 || MLiq == 0) {
             LShare = 0;
@@ -448,22 +462,28 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @inheritdoc IEnergyAMM
      */
     function liquidityReduction(uint256 LAmount) external view returns (uint256 LShare, uint256 ELiq, uint256 MLiq) {
-        if (LAmount > _LToken.balanceOf(msg.sender)) {
-            LAmount = _LToken.balanceOf(msg.sender);
+        if (LAmount > this.liquidity()) {
+            LAmount = this.liquidity();
+        }
+        uint256 liquidityNew = this.liquidity() - LAmount;
+
+        uint256 EReserveNew = 0;
+        if (this.EReserve() == 0 || this.MReserve() == 0) {
+            EReserveNew = liquidityNew;
+        } else {
+            EReserveNew = liquidityNew * Math.sqrt(this.EReserve()) / Math.sqrt(this.MReserve());
         }
 
-        UD60x18 liqPrice = ud(1e18);
-        if (this.EReserve() != 0 && this.MReserve() != 0) {
-            liqPrice = ud(this.MReserve() * 1e18 / this.EReserve());
+        uint256 MReserveNew = 0;
+        if (this.EReserve() == 0 || this.MReserve() == 0) {
+            MReserveNew = liquidityNew;
+        } else {
+            MReserveNew = liquidityNew * Math.sqrt(this.MReserve()) / Math.sqrt(this.EReserve());
         }
 
-        uint256 liquidityNew = _LToken.totalSupply() - LAmount;
-        uint256 EReserveNew = liquidityNew * 1e18 / sqrt(liqPrice).unwrap();
-        uint256 MReserveNew = liquidityNew * sqrt(liqPrice).unwrap() / 1e18;
-
-        LShare = _LToken.totalSupply() - liquidityNew;
-        ELiq = this.EReserve() - EReserveNew;
-        MLiq = this.MReserve() - MReserveNew;
+        LShare = liquidityNew > this.liquidity() ? 0 : this.liquidity() - liquidityNew;
+        ELiq = EReserveNew > this.EReserve() ? 0 : this.EReserve() - EReserveNew;
+        MLiq = MReserveNew > this.MReserve() ? 0 : this.MReserve() - MReserveNew;
 
         if (LShare == 0 || ELiq == 0 || MLiq == 0) {
             LShare = 0;
@@ -476,10 +496,10 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @inheritdoc IEnergyAMM
      */
     function liquidityProportion(address provider) external view returns (UD60x18) {
-        if (_LToken.totalSupply() == 0) {
+        if (this.liquidity() == 0) {
             return ud(0);
         }
-        return ud(_LToken.balanceOf(provider) * 1e18 / _LToken.totalSupply());
+        return ud(_LToken.balanceOf(provider) * 1e18 / this.liquidity());
     }
 
     /**
@@ -509,7 +529,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         require(_MToken.transferFrom(msg.sender, address(this), MSwap + MFee));
         require(_EToken.transfer(msg.sender, ESwap));
 
-        emit MarketStateChanged(this.poolPrice(), this.EReserve(), this.MReserve(), _LToken.totalSupply());
+        emit MarketStateChanged(this.poolPrice(), this.EReserve(), this.MReserve(), this.liquidity());
     }
 
     /**
@@ -539,7 +559,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         require(_MToken.transfer(msg.sender, MSwap - MFee));
         require(_EToken.transferFrom(msg.sender, address(this), ESwap));
 
-        emit MarketStateChanged(this.poolPrice(), this.EReserve(), this.MReserve(), _LToken.totalSupply());
+        emit MarketStateChanged(this.poolPrice(), this.EReserve(), this.MReserve(), this.liquidity());
     }
 
     /**
@@ -572,7 +592,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         _LToken.mint(msg.sender, LShare);
 
-        emit MarketStateChanged(this.poolPrice(), this.EReserve(), this.MReserve(), _LToken.totalSupply());
+        emit MarketStateChanged(this.poolPrice(), this.EReserve(), this.MReserve(), this.liquidity());
     }
 
     /**
@@ -597,7 +617,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         _LToken.burn(msg.sender, LShare);
 
-        emit MarketStateChanged(this.poolPrice(), this.EReserve(), this.MReserve(), _LToken.totalSupply());
+        emit MarketStateChanged(this.poolPrice(), this.EReserve(), this.MReserve(), this.liquidity());
     }
 
     /**

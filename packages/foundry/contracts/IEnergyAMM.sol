@@ -99,6 +99,13 @@ interface IEnergyAMM {
     function MReserve() external view returns (uint256);
 
     /**
+     * @notice Returns the amount of liquidity in the liquidity pool.
+     * @dev This is equivalent to the total supply of LTokens.
+     * @return The amount of market liquidity.
+     */
+    function liquidity() external view returns (uint256);
+
+    /**
      * @notice Returns the range of possible values for the pool price.
      * @return The pool price range.
      */
