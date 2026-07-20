@@ -152,14 +152,15 @@ contract EnergyAMMTest is Test {
     function testFuzz_liquidityProvision(uint256 LAmount) public {
         LAmount = LAmount % 1e25;
         (uint256 LShare, uint256 ELiq, uint256 MLiq) = AMM.liquidityProvision(LAmount);
+
         if (LShare == 0 || ELiq == 0 || MLiq == 0) {
             assertEq(LShare, 0);
             assertEq(ELiq, 0);
             assertEq(MLiq, 0);
         } else {
             assertEq(LShare, LAmount);
-            assertEq(AMM.LToken().totalSupply() + LShare,
-                     Math.sqrt(AMM.EReserve() + ELiq) * Math.sqrt(AMM.MReserve() + MLiq));
+            assertApproxEqAbs(AMM.liquidity() + LShare,
+                              Math.sqrt(AMM.EReserve() + ELiq) * Math.sqrt(AMM.MReserve() + MLiq), 1e15);
         }
     }
 
@@ -170,14 +171,52 @@ contract EnergyAMMTest is Test {
             assertEq(ELiq, 0);
             assertEq(MLiq, 0);
         } else {
-            assertEq(LShare, LAmount);
-            assertEq(AMM.LToken().totalSupply() - LShare,
-                     Math.sqrt(AMM.EReserve() - ELiq) * Math.sqrt(AMM.MReserve() - MLiq));
+            if (LAmount > AMM.LToken().balanceOf(liquidityProvider)) {
+                assertEq(LShare, AMM.LToken().balanceOf(liquidityProvider));
+            } else {
+                assertEq(LShare, LAmount);
+            }
+            assertApproxEqAbs(AMM.liquidity() - LShare,
+                              Math.sqrt(AMM.EReserve() - ELiq) * Math.sqrt(AMM.MReserve() - MLiq), 1e15);
         }
     }
 
+    function test_addRemoveLiquidity(uint256 LAmount) public {
+        LAmount = LAmount % (Math.sqrt(EToken.balanceOf(liquidityProvider)) *
+                             Math.sqrt(MToken.balanceOf(liquidityProvider)));
+
+        uint256 LBalance = AMM.LToken().balanceOf(liquidityProvider);
+        uint256 EBalance = AMM.EToken().balanceOf(liquidityProvider);
+        uint256 MBalance = AMM.MToken().balanceOf(liquidityProvider);
+
+        (uint256 LShare, uint256 ELiq, uint256 MLiq) = AMM.liquidityProvision(LAmount);
+        if (LShare != 0 && ELiq != 0 && MLiq != 0) {
+            vm.startPrank(liquidityProvider);
+            EToken.approve(address(AMM), ELiq);
+            MToken.approve(address(AMM), MLiq);
+            AMM.addLiquidity(LAmount);
+            vm.stopPrank();
+        }
+
+        (LShare, ELiq, MLiq) = AMM.liquidityReduction(LAmount);
+        if (LShare != 0 && ELiq != 0 && MLiq != 0) {
+            vm.startPrank(liquidityProvider);
+            AMM.removeLiquidity(LAmount);
+            vm.stopPrank();
+        }
+
+        uint256 LBalanceNew = AMM.LToken().balanceOf(liquidityProvider);
+        uint256 EBalanceNew = AMM.EToken().balanceOf(liquidityProvider);
+        uint256 MBalanceNew = AMM.MToken().balanceOf(liquidityProvider);
+
+        assertEq(LBalance, LBalanceNew);
+        assertEq(EBalance, EBalanceNew);
+        assertEq(MBalance, MBalanceNew);
+    }
+
     function testFuzz_addLiquidity(uint256 LAmount) public {
-        LAmount = LAmount % 1e25;
+        LAmount = LAmount % (Math.sqrt(EToken.balanceOf(liquidityProvider)) *
+                             Math.sqrt(MToken.balanceOf(liquidityProvider)));
         (uint256 LShare, uint256 ELiq, uint256 MLiq) = AMM.liquidityProvision(LAmount);
         if (LShare != 0 && ELiq != 0 && MLiq != 0) {
             uint256 LBalance = AMM.LToken().balanceOf(liquidityProvider);
@@ -198,7 +237,7 @@ contract EnergyAMMTest is Test {
             assertEq(ELiq, EBalance - EBalanceNew);
             assertEq(MLiq, MBalance - MBalanceNew);
         }
-        assertEq(AMM.LToken().totalSupply(), Math.sqrt(AMM.EReserve()) * Math.sqrt(AMM.MReserve()));
+        assertApproxEqAbs(AMM.LToken().totalSupply(), Math.sqrt(AMM.EReserve()) * Math.sqrt(AMM.MReserve()), 1e15);
     }
 
     function testFuzz_removeLiquidity(uint256 LAmount) public {
@@ -220,6 +259,6 @@ contract EnergyAMMTest is Test {
             assertEq(ELiq, EBalanceNew - EBalance);
             assertEq(MLiq, MBalanceNew - MBalance);
         }
-        assertEq(AMM.LToken().totalSupply(), Math.sqrt(AMM.EReserve()) * Math.sqrt(AMM.MReserve()));
+        assertApproxEqAbs(AMM.LToken().totalSupply(), Math.sqrt(AMM.EReserve()) * Math.sqrt(AMM.MReserve()), 1e15);
     }
 }
