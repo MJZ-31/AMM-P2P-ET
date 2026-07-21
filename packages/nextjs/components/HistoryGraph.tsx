@@ -82,8 +82,9 @@ export default function HistoryGraph(props: Props) {
           pointRadius: '1'
         },
         {
+          type: "scatter",
           data: [
-              { "x": new Date(), "y": props.poolPriceMin },
+              { "x": props.startTimestamp || marketHistory[0].timestamp, "y": props.poolPriceMin },
               { "x": new Date(), "y": props.poolPriceMax }
           ],
           pointRadius: '0'
