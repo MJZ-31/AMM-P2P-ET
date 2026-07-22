@@ -7,7 +7,6 @@ import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWriteContr
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Stack from '@mui/material/Stack';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 
@@ -52,10 +51,6 @@ const TradePage = () => {
             setMAmount(askSwap?.data ? askSwap.data[1] : undefined);
         }
     }, [bidSwap, askSwap, buyOrSell]);
-
-    // useEffect(() => {
-    //     document.getElementById("MAmount-input").value = MAmount ? Number(MAmount) / 1e18 : "";
-    // }, [MAmount]);
 
     const { writeContractAsync: writeEnergyAMM } = useScaffoldWriteContract({ contractName: "EnergyAMM" });
     const { writeContractAsync: writeEToken } = useScaffoldWriteContract({ contractName: "EToken" });
