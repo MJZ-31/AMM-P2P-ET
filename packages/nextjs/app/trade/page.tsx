@@ -2,10 +2,18 @@
 
 import { useEffect, useState } from 'react';
 
+import { BaseInput } from '@scaffold-ui/components';
 import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWriteContract } from '~~/hooks/scaffold-eth';
+
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
 
 const TradePage = () => {
     const [buyOrSell, setBuyOrSell] = useState("Buy");
+    const [energyAmount, setEnergyAmount] = useState("");
     const [EAmount, setEAmount] = useState();
     const [MAmount, setMAmount] = useState();
 
@@ -45,9 +53,9 @@ const TradePage = () => {
         }
     }, [bidSwap, askSwap, buyOrSell]);
 
-    useEffect(() => {
-        document.getElementById("MAmount-input").value = MAmount ? Number(MAmount) / 1e18 : "";
-    }, [MAmount]);
+    // useEffect(() => {
+    //     document.getElementById("MAmount-input").value = MAmount ? Number(MAmount) / 1e18 : "";
+    // }, [MAmount]);
 
     const { writeContractAsync: writeEnergyAMM } = useScaffoldWriteContract({ contractName: "EnergyAMM" });
     const { writeContractAsync: writeEToken } = useScaffoldWriteContract({ contractName: "EToken" });
@@ -79,6 +87,7 @@ const TradePage = () => {
                     args: [EAmount]
                 });
             }
+            setEnergyAmount(0);
             setEAmount(0);
             setMAmount(0);
         } catch (e) {
@@ -87,26 +96,34 @@ const TradePage = () => {
     }
 
     return (
-      <>
-        <form action={confirm}>
-          <input id="EAmount-input" type="text" placeholder="0" autoComplete="off"
-            onChange={() => {
-                setEAmount(Math.floor(document.getElementById("EAmount-input").value * 1e18));
+      <center>
+        <Box sx={{ width: '50%', p: 2}}>
+          <Tabs
+            value={buyOrSell}
+            onChange={(event: React.SyntheticEvent, newValue: string) => {
+                setBuyOrSell(newValue);
             }}
-          /><label>kWh</label><br/>
-          <label>$</label><input id="MAmount-input" type="text" readOnly placeholder="0"/><br/>
-          <input id="buyOrSell-button" type="button" value={buyOrSell}
-            onClick={() => {
-                if (buyOrSell == "Buy") {
-                    setBuyOrSell("Sell");
-                } else {
-                    setBuyOrSell("Buy");
-                }
+          >
+            <Tab value="Buy" label="Buy"/>
+            <Tab value="Sell" label="Sell"/>
+          </Tabs>
+          <label>Energy to {buyOrSell} (kWh):</label>
+          <BaseInput
+            placeholder="0"
+            value={energyAmount}
+            onChange={(value) => {
+                setEnergyAmount(value);
+                setEAmount(value ? Math.floor(parseFloat(value) * 1e18) : 0);
             }}
           />
-          <input id="trade-confirm" type="submit" value="Confirm"/>
-        </form>
-      </>
+          <label>Base {buyOrSell == "Buy" ? "Price" : "Earnings"} ($):</label>
+          <BaseInput
+            placeholder="0"
+            value={MAmount ? Number(MAmount) / 1.0e18 : 0}
+            onChange={(value) => {}}/>
+          <Button variant="contained" onClick={confirm}>Confirm</Button>
+        </Box>
+      </center>
     );
 }
 
