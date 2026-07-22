@@ -2,10 +2,17 @@
 
 import { useEffect, useState } from 'react';
 
+import { BaseInput } from '@scaffold-ui/components';
 import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWriteContract } from '~~/hooks/scaffold-eth';
+
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
 
 const LiquidityPage = () => {
     const [addOrRemove, setAddOrRemove] = useState("Add");
+    const [liquidityAmount, setLiquidityAmount] = useState("");
     const [LAmount, setLAmount] = useState();
     const [EAmount, setEAmount] = useState();
     const [MAmount, setMAmount] = useState();
@@ -26,25 +33,21 @@ const LiquidityPage = () => {
 
     useEffect(() => {
         if (addOrRemove == "Add") {
-            console.log(liqAdd?.data)
-            console.log(LAmount)
             setEAmount(liqAdd?.data ? liqAdd.data[1] : undefined);
             setMAmount(liqAdd?.data ? liqAdd.data[2] : undefined);
         } else if (addOrRemove == "Remove") {
-            console.log(liqRemove?.data)
-            console.log(LAmount)
             setEAmount(liqRemove?.data ? liqRemove.data[1] : undefined);
             setMAmount(liqRemove?.data ? liqRemove.data[2] : undefined);
         }
     }, [liqAdd, liqRemove, addOrRemove]);
 
-    useEffect(() => {
-        document.getElementById("EAmount-input").value = EAmount ? Number(EAmount) / 1e18 : "";
-    }, [EAmount]);
+    // useEffect(() => {
+    //     document.getElementById("EAmount-input").value = EAmount ? Number(EAmount) / 1e18 : "";
+    // }, [EAmount]);
 
-    useEffect(() => {
-        document.getElementById("MAmount-input").value = MAmount ? Number(MAmount) / 1e18 : "";
-    }, [MAmount]);
+    // useEffect(() => {
+    //     document.getElementById("MAmount-input").value = MAmount ? Number(MAmount) / 1e18 : "";
+    // }, [MAmount]);
 
     const { writeContractAsync: writeEnergyAMM } = useScaffoldWriteContract({ contractName: "EnergyAMM" });
     const { writeContractAsync: writeEToken } = useScaffoldWriteContract({ contractName: "EToken" });
@@ -82,27 +85,41 @@ const LiquidityPage = () => {
     }
 
     return (
-      <>
-        <form action={confirm}>
-          <input id="LAmount-input" type="text" placeholder="0" autoComplete="off"
-            onChange={() => {
-                setLAmount(Math.floor(document.getElementById("LAmount-input").value * 1e18));
+      <center>
+        <Box sx={{ width: '50%', p: 2}}>
+          <Tabs
+            value={addOrRemove}
+            onChange={(event: React.SyntheticEvent, newValue: string) => {
+                setAddOrRemove(newValue);
             }}
-          /><label> Shares</label><br/>
-          <input id="EAmount-input" type="text" readOnly placeholder="0"/><label> kWh</label><br/>
-          <label>$ </label><input id="MAmount-input" type="text" readOnly placeholder="0"/><br/>
-          <input id="addOrRemove-button" type="button" value={addOrRemove}
-            onClick={() => {
-                if (addOrRemove == "Add") {
-                    setAddOrRemove("Remove");
-                } else {
-                    setAddOrRemove("Add");
-                }
+          >
+            <Tab value="Add" label="Add"/>
+            <Tab value="Remove" label="Remove"/>
+          </Tabs>
+          <label>Liquidity to {addOrRemove}:</label>
+          <BaseInput
+            placeholder="0"
+            value={liquidityAmount}
+            onChange={(value) => {
+                setLiquidityAmount(value);
+                setLAmount(value ? Math.floor(parseFloat(value) * 1e18) : 0);
             }}
-          /><br/>
-          <input id="liquidity-confirm" type="submit" value="Confirm"/>
-        </form>
-      </>
+          />
+          <label>Energy to {addOrRemove} (kWh):</label>
+          <BaseInput
+            placeholder="0"
+            value={EAmount ? Number(EAmount) / 1.0e18 : 0}
+            onChange={(value) => {}}
+          />
+          <label>Funds to {addOrRemove} ($):</label>
+          <BaseInput
+            placeholder="0"
+            value={MAmount ? Number(MAmount) / 1.0e18 : 0}
+            onChange={(value) => {}}
+          />
+          <Button variant="contained" onClick={confirm}>Confirm</Button>
+        </Box>
+      </center>
     );
 }
 
