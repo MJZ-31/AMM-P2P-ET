@@ -32,48 +32,48 @@ const TradePage = () => {
         contractName: "EToken",
         functionName: "balanceOf",
         args: [connectedAddress]
-    });
+    })?.data;
 
     const MBalance = useScaffoldReadContract({
         contractName: "MToken",
         functionName: "balanceOf",
         args: [connectedAddress]
-    });
+    })?.data;
 
     const bidSwap = useScaffoldReadContract({
         contractName: "EnergyAMM",
         functionName: "bidSwap",
         args: [EAmount],
         watch: true
-    });
+    })?.data;
     
     const bidFee = useScaffoldReadContract({
         contractName: "EnergyAMM",
         functionName: "bidFee",
         args: [EAmount],
         watch: true
-    });
+    })?.data;
 
     const askSwap = useScaffoldReadContract({
         contractName: "EnergyAMM",
         functionName: "askSwap",
         args: [EAmount],
         watch: true
-    });
+    })?.data;
 
     const askFee = useScaffoldReadContract({
         contractName: "EnergyAMM",
         functionName: "askFee",
         args: [EAmount],
         watch: true
-    });
+    })?.data;
 
     useEffect(() => {
         if (buyOrSell == "Buy") {
-            setMAmount(bidSwap?.data ? bidSwap.data[1] : undefined);
+            setMAmount(bidSwap?.[1]);
             setError(undefined);
             setEInputError(false);
-            if (MAmount > MBalance.data) {
+            if (MAmount > MBalance) {
                 setError("Required funds exceed your account balance.");
                 setMInputError(true);
             } else {
@@ -81,10 +81,10 @@ const TradePage = () => {
                 setMInputError(false);
             }
         } else if (buyOrSell == "Sell") {
-            setMAmount(askSwap?.data ? askSwap.data[1] : undefined);
+            setMAmount(askSwap?.[1]);
             setError(undefined);
             setMInputError(false);
-            if (EAmount > EBalance.data) {
+            if (EAmount > EBalance) {
                 setError("Energy amount exceeds your account balance.");
                 setEInputError(true);
             } else {
@@ -104,21 +104,18 @@ const TradePage = () => {
         transactionInProgress.current = true;
         try {
             if (buyOrSell == "Buy") {
-                bidSwap.refetch()
-                bidFee.refetch()
                 await writeMToken({
                     functionName: "approve",
-                    args: [EnergyAMMInfo.address, bidSwap?.data[1] + bidFee?.data]
+                    args: [EnergyAMMInfo.address, (bidSwap?.[1] || 0) + (bidFee || 0)]
                 });
                 await writeEnergyAMM({
                     functionName: "buy",
                     args: [EAmount]
                 });
             } else if (buyOrSell == "Sell") {
-                askSwap.refetch()
                 await writeEToken({
                     functionName: "approve",
-                    args: [EnergyAMMInfo.address, askSwap?.data[0]]
+                    args: [EnergyAMMInfo.address, askSwap?.[0]]
                 });
                 await writeEnergyAMM({
                     functionName: "sell",
@@ -136,7 +133,7 @@ const TradePage = () => {
 
     return (
       <>
-        <Stack direction="row">
+        <Stack sx={{ center: true, pl: 20, pr: 20 }} direction="row" spacing={5}>
           <Box sx={{ center: true, width: '50%', p: 2}}>
             <Tabs
               value={buyOrSell}
@@ -179,42 +176,52 @@ const TradePage = () => {
           <Box sx={{ center: true, width: '50%', p: 2}}>
             <Stack>
               <p className="text-3xl">Transaction Info</p>
-              <Grid container spacing={1}>
-                <Grid size={4}></Grid>
+              <Grid container spacing={2} rowSpacing={1}>
+                {/* <Grid size={4}></Grid>
                 <Grid size={4}>
                   <p className="text-base">kWh</p>
                 </Grid>
                 <Grid size={4}>
                   <p className="text-base">$</p>
-                </Grid>
+                </Grid> */}
 
-                <Grid size={4}>
+                <Grid size={2}>
                   <p className="text-base font-bold">Your Assets</p>
                 </Grid>
-                <Grid size={4}>
-                  <p className="text-base">{(EBalance?.data ? (Number(EBalance.data) / 1e18).toFixed(2) : "...") + " kWh"}</p>
+                <Grid size={5}>
+                  <p className="text-base text-right">
+                    {(EBalance ? (Number(EBalance) / 1e18).toFixed(2) : "0.00") + " kWh"}
+                  </p>
                 </Grid>
-                <Grid size={4}>
-                  <p className="text-base">{"$ " + (MBalance?.data ? (Number(MBalance.data) / 1e18).toFixed(2) : "...")}</p>
+                <Grid size={5}>
+                  <p className="text-base text-right">
+                    {"$ " + (MBalance ? (Number(MBalance) / 1e18).toFixed(2) : "0.00")}
+                  </p>
                 </Grid>
 
-                <Grid size={4}>
+                <Grid size={2}>
                   <p className="text-base font-bold">Swap</p>
                 </Grid>
-                <Grid size={4}>
-                  <p className="text-base">{(buyOrSell == "Buy" ? "+ " : "- ") + (EAmount ? (Number(EAmount) / 1e18).toFixed(2) : "...") + " kWh"}</p>
+                <Grid size={5}>
+                  <p className="text-base text-right">
+                    {(EAmount ? ((buyOrSell == "Buy" ? "+ " : "- ") + (Number(EAmount) / 1e18).toFixed(2)) : "0.00") + " kWh"}
+                  </p>
                 </Grid>
-                <Grid size={4}>
-                  <p className="text-base">{(buyOrSell == "Buy" ? "- " : "+ ") + "$ " + (MAmount ? (Number(MAmount) / 1e18).toFixed(2) : "...")}</p>
+                <Grid size={5}>
+                  <p className="text-base text-right">
+                    {(MAmount ? ((buyOrSell == "Buy" ? "- " : "+ ") + "$ " + (Number(MAmount) / 1e18).toFixed(2)) : "$ 0.00")}
+                  </p>
                 </Grid>
 
-                <Grid size={4}>
+                <Grid size={2}>
                   <p className="text-base font-bold">Swap Fee</p>
                 </Grid>
-                <Grid size={4}>
+                <Grid size={5}>
                 </Grid>
-                <Grid size={4}>
-                  <p className="text-base">{"- $ " + ((Number((buyOrSell == "Buy" ? bidFee : askFee)?.data) / 1e18).toFixed(2) || "...")}</p>
+                <Grid size={5}>
+                  <p className="text-base text-right">
+                    {isNaN((Number((buyOrSell == "Buy" ? bidFee : askFee)) / 1e18).toFixed(2)) ? "$ 0.00" : "- $ " + (Number((buyOrSell == "Buy" ? bidFee : askFee)) / 1e18).toFixed(2)}
+                  </p>
                 </Grid>
               </Grid>
             </Stack>
