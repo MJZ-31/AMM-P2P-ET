@@ -91,6 +91,8 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      */
     UD60x18 public feeRate;
 
+    address[] private _liquidityProviders;
+
     /**
      * @dev Functions with this modifier will recalculate the liquidity of the market after it executes.
      */
@@ -100,6 +102,19 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         _liquidity = _calculateLiquidity(this.EReserve(), this.MReserve(), _poolPriceSqrtRangeX18);
         _EVirtual = _calculateEVirtual(_liquidity, _poolPriceSqrtRangeX18);
         _MVirtual = _calculateMVirtual(_liquidity, _poolPriceSqrtRangeX18);
+    }
+
+    modifier feeCollection(uint256 oldLiquidity) {
+        _;
+
+        uint256 newLiquidity = this.liquidity();
+        uint256 liqDiff = newLiquidity - oldLiquidity;
+        for (uint i = 0; i < _liquidityProviders.length; ++i) {
+            address provider = _liquidityProviders[i];
+            UD60x18 proportion = ud(_LToken.balanceOf(provider) * 1e18 / oldLiquidity);
+            uint256 LShare = liqDiff * proportion.unwrap() / 1e18;
+            _LToken.mint(provider, LShare);
+        }
     }
 
     constructor(IERC20Metadata EToken_, IERC20Metadata MToken_) Ownable(msg.sender) {
@@ -505,7 +520,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function buy(uint256 EAmount) external liquidityShift returns (TradeInfo memory info) {
+    function buy(uint256 EAmount) external liquidityShift feeCollection(this.liquidity()) returns (TradeInfo memory info) {
         (uint256 ESwap, uint256 MSwap) = this.bidSwap(EAmount);
         uint256 MFee = this.bidFee(EAmount);
 
@@ -535,7 +550,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function sell(uint256 EAmount) external liquidityShift returns (TradeInfo memory info) {
+    function sell(uint256 EAmount) external liquidityShift feeCollection(this.liquidity()) returns (TradeInfo memory info) {
         (uint256 ESwap, uint256 MSwap) = this.askSwap(EAmount);
         uint256 MFee = this.askFee(EAmount);
 
@@ -590,6 +605,9 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         require(_EToken.transferFrom(msg.sender, address(this), ELiq));
         require(_MToken.transferFrom(msg.sender, address(this), MLiq));
 
+        if (_LToken.balanceOf(msg.sender) == 0) {
+            _liquidityProviders.push(msg.sender);
+        }
         _LToken.mint(msg.sender, LShare);
 
         emit MarketStateChanged(this.poolPrice(), this.EReserve(), this.MReserve(), this.liquidity());
@@ -616,6 +634,18 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         require(_MToken.transfer(msg.sender, MLiq));
 
         _LToken.burn(msg.sender, LShare);
+        if (_LToken.balanceOf(msg.sender) == 0) {
+            for (uint i = 0; i < _liquidityProviders.length; i++) {
+                if (_liquidityProviders[i] == msg.sender) {
+                    for (uint j = i; j < _liquidityProviders.length - 1; ++j) {
+                        _liquidityProviders[i] =_liquidityProviders[i + 1]; 
+                    }
+                    _liquidityProviders.pop();
+                    break;
+                }
+            }
+            _liquidityProviders.push(msg.sender);
+        }
 
         emit MarketStateChanged(this.poolPrice(), this.EReserve(), this.MReserve(), this.liquidity());
     }
