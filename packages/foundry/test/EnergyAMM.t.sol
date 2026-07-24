@@ -105,6 +105,10 @@ contract EnergyAMMTest is Test {
         assertEq(AMM.MReserve(), AMM.MToken().balanceOf(address(AMM)));
     }
 
+    function testFuzz_liquidity() public {
+        assertApproxEqAbs(AMM.liquidity(), Math.sqrt(AMM.EReserve() * AMM.MReserve()), 1e15);
+    }
+
     function testFuzz_poolPriceRange() public {
         assert(AMM.poolPriceRange().isValid());
     }
