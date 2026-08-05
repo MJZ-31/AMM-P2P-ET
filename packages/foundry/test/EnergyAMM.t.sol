@@ -106,7 +106,7 @@ contract EnergyAMMTest is Test {
     }
 
     function testFuzz_liquidity() public {
-        assertApproxEqAbs(AMM.liquidity(), Math.sqrt(AMM.EReserve() * AMM.MReserve()), 1e15);
+        assertEq(AMM.liquidity(), AMM.LToken().totalSupply());
     }
 
     function testFuzz_poolPriceRange() public {
@@ -163,8 +163,7 @@ contract EnergyAMMTest is Test {
             assertEq(MLiq, 0);
         } else {
             assertEq(LShare, LAmount);
-            assertApproxEqAbs(AMM.liquidity() + LShare,
-                              Math.sqrt(AMM.EReserve() + ELiq) * Math.sqrt(AMM.MReserve() + MLiq), 1e15);
+            assertEq(AMM.liquidity() + LShare, Math.sqrt((AMM.EReserve() + ELiq) * (AMM.MReserve() + MLiq)));
         }
     }
 
@@ -180,8 +179,7 @@ contract EnergyAMMTest is Test {
             } else {
                 assertEq(LShare, LAmount);
             }
-            assertApproxEqAbs(AMM.liquidity() - LShare,
-                              Math.sqrt(AMM.EReserve() - ELiq) * Math.sqrt(AMM.MReserve() - MLiq), 1e15);
+            assertEq(AMM.liquidity() - LShare, Math.sqrt((AMM.EReserve() - ELiq) * (AMM.MReserve() - MLiq)));
         }
     }
 
@@ -193,21 +191,27 @@ contract EnergyAMMTest is Test {
         uint256 EBalance = AMM.EToken().balanceOf(liquidityProvider);
         uint256 MBalance = AMM.MToken().balanceOf(liquidityProvider);
 
-        (uint256 LShare, uint256 ELiq, uint256 MLiq) = AMM.liquidityProvision(LAmount);
-        if (LShare != 0 && ELiq != 0 && MLiq != 0) {
+        uint256 EReserve = AMM.EReserve();
+        uint256 MReserve = AMM.MReserve();
+        uint256 liquidity = AMM.liquidity();
+
+        (uint256 LShareAdd, uint256 ELiqAdd, uint256 MLiqAdd) = AMM.liquidityProvision(LAmount);
+        if (LShareAdd != 0 && ELiqAdd != 0 && MLiqAdd != 0) {
             vm.startPrank(liquidityProvider);
-            EToken.approve(address(AMM), ELiq);
-            MToken.approve(address(AMM), MLiq);
+            EToken.approve(address(AMM), ELiqAdd);
+            MToken.approve(address(AMM), MLiqAdd);
             AMM.addLiquidity(LAmount);
             vm.stopPrank();
         }
 
-        (LShare, ELiq, MLiq) = AMM.liquidityReduction(LAmount);
-        if (LShare != 0 && ELiq != 0 && MLiq != 0) {
+        (uint256 LShareRemove, uint256 ELiqRemove, uint256 MLiqRemove) = AMM.liquidityReduction(LAmount);
+        if (LShareRemove != 0 && ELiqRemove != 0 && MLiqRemove != 0) {
             vm.startPrank(liquidityProvider);
             AMM.removeLiquidity(LAmount);
             vm.stopPrank();
         }
+
+        assertEq(LShareAdd, LShareRemove);
 
         uint256 LBalanceNew = AMM.LToken().balanceOf(liquidityProvider);
         uint256 EBalanceNew = AMM.EToken().balanceOf(liquidityProvider);
@@ -216,6 +220,10 @@ contract EnergyAMMTest is Test {
         assertEq(LBalance, LBalanceNew);
         assertEq(EBalance, EBalanceNew);
         assertEq(MBalance, MBalanceNew);
+
+        assertEq(EReserve, AMM.EReserve());
+        assertEq(MReserve, AMM.MReserve());
+        assertEq(liquidity, AMM.liquidity());
     }
 
     function testFuzz_addLiquidity(uint256 LAmount) public {
@@ -241,7 +249,7 @@ contract EnergyAMMTest is Test {
             assertEq(ELiq, EBalance - EBalanceNew);
             assertEq(MLiq, MBalance - MBalanceNew);
         }
-        assertApproxEqAbs(AMM.LToken().totalSupply(), Math.sqrt(AMM.EReserve()) * Math.sqrt(AMM.MReserve()), 1e15);
+        assertEq(AMM.liquidity(), Math.sqrt(AMM.EReserve() * AMM.MReserve()));
     }
 
     function testFuzz_removeLiquidity(uint256 LAmount) public {
@@ -263,6 +271,6 @@ contract EnergyAMMTest is Test {
             assertEq(ELiq, EBalanceNew - EBalance);
             assertEq(MLiq, MBalanceNew - MBalance);
         }
-        assertApproxEqAbs(AMM.LToken().totalSupply(), Math.sqrt(AMM.EReserve()) * Math.sqrt(AMM.MReserve()), 1e15);
+        assertEq(AMM.liquidity(), Math.sqrt(AMM.EReserve() * AMM.MReserve()));
     }
 }
