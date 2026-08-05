@@ -204,10 +204,7 @@ interface IEnergyAMM {
      * @return MLiq The amount of MTokens that will be transferred from the sender to the liquidity pool. This may be
      * lower than MAmount to keep the addition price point in the pool price range.
      */
-    function liquidityProvision(uint256 LAmount)
-        external
-        view
-        returns (uint256 LShare, uint256 ELiq, uint256 MLiq);
+    function liquidityProvision(uint256 LAmount) external view returns (uint256 LShare, uint256 ELiq, uint256 MLiq);
 
     /**
      * @notice Returns the amount of MTokens and ETokens to be returned to a liquidity provider for a liquidity removal.

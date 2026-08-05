@@ -226,7 +226,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         uint256 liqLeft = liquidityOld_ > liquidityNew_ ? liquidityOld_ - liquidityNew_ : liquidityNew_ - liquidityOld_;
 
-        for (uint i = 0; i < _liquidityProviders.length; ++i) {
+        for (uint256 i = 0; i < _liquidityProviders.length; ++i) {
             address provider = _liquidityProviders[i];
             uint256 balanceOld = _LToken.balanceOf(provider);
 
@@ -760,10 +760,10 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         require(_MToken.transfer(msg.sender, MLiq));
 
         if (_LToken.balanceOf(msg.sender) == 0) {
-            for (uint i = 0; i < _liquidityProviders.length; i++) {
+            for (uint256 i = 0; i < _liquidityProviders.length; i++) {
                 if (_liquidityProviders[i] == msg.sender) {
-                    for (uint j = i; j < _liquidityProviders.length - 1; ++j) {
-                        _liquidityProviders[i] =_liquidityProviders[i + 1]; 
+                    for (uint256 j = i; j < _liquidityProviders.length - 1; ++j) {
+                        _liquidityProviders[i] = _liquidityProviders[i + 1];
                     }
                     _liquidityProviders.pop();
                     break;
