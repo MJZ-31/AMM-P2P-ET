@@ -756,7 +756,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
             for (uint256 i = 0; i < _liquidityProviders.length; i++) {
                 if (_liquidityProviders[i] == msg.sender) {
                     for (uint256 j = i; j < _liquidityProviders.length - 1; ++j) {
-                        _liquidityProviders[i] = _liquidityProviders[i + 1];
+                        _liquidityProviders[j] = _liquidityProviders[j + 1];
                     }
                     _liquidityProviders.pop();
                     break;
