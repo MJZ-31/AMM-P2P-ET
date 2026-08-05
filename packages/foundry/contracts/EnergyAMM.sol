@@ -93,16 +93,6 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     Range private _poolPriceSqrtRangeX18;
 
     /**
-     * @dev The range possible bid amounts.
-     */
-    Range private _bidRange;
-
-    /**
-     * @dev The range possible ask amounts.
-     */
-    Range private _askRange;
-
-    /**
      * @dev The fee rate of swaps.
      */
     UD60x18 public _feeRate;
@@ -154,7 +144,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         _EToken = EToken_;
         _MToken = MToken_;
-        _LToken = new ERC20Ownable("EnergyAMM Liquidity Token", "ELIQ", EToken_.decimals());
+        _LToken = new ERC20Ownable("EnergyAMM Liquidity Token", "ELIQ", 18);
 
         _EReserve = 0;
         _MReserve = 0;
@@ -163,6 +153,9 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         _EVirtual = 0;
         _MVirtual = 0;
         _liquidityVirtual = 0;
+
+        _poolPriceRangeX18 = Range(0, 0, false, false);
+        _poolPriceSqrtRangeX18 = Range(0, 0, false, false);
 
         _feeRate = ud(0);
 
