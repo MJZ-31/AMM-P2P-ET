@@ -34,8 +34,8 @@ ChartJS.register(
 interface Props {
     startTimestamp: Date,
     endTimestamp: Date
-    poolPriceMin: number
-    poolPriceMax: number
+    swapPriceMin: number
+    swapPriceMax: number
 }
 
 export default function HistoryGraph(props: Props) {
@@ -66,8 +66,8 @@ export default function HistoryGraph(props: Props) {
               type: "time",
           },
           y: {
-              min: props.poolPriceMin,
-              max: props.poolPriceMax,
+              min: props.swapPriceMin,
+              max: props.swapPriceMax,
           }
       },
     };
@@ -84,8 +84,8 @@ export default function HistoryGraph(props: Props) {
         {
           type: "scatter",
           data: [
-              { "x": props.startTimestamp || marketHistory[0].timestamp, "y": props.poolPriceMin },
-              { "x": new Date(), "y": props.poolPriceMax }
+              { "x": props.startTimestamp || marketHistory[0].timestamp, "y": props.swapPriceMin },
+              { "x": new Date(), "y": props.swapPriceMax }
           ],
           pointRadius: '0'
         }

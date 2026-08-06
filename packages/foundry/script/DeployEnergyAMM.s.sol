@@ -36,7 +36,7 @@ contract DeployEnergyAMM is ScaffoldETHDeploy {
         MToken mToken = new MToken();
         EnergyAMM AMM = new EnergyAMM(IERC20Metadata(eToken), IERC20Metadata(mToken));
 
-        AMM.setPoolPriceRange(Range(0.5e18, 2e18, false, false));
+        AMM.setSwapPriceRange(Range(0.5e18, 2e18, false, false));
         AMM.setFeeRate(ud(0.01e18));
 
         eToken.mint(deployer, 1e25);

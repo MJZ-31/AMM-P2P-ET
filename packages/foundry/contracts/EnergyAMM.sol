@@ -15,7 +15,7 @@ import {
     MarketStateChanged,
     InsufficientAllowance,
     ZeroTransfer,
-    TradeInfo,
+    SwapInfo,
     LiquidityInfo,
     IEnergyAMM
 } from "./IEnergyAMM.sol";
@@ -83,14 +83,14 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     uint256 private _liquidityVirtual;
 
     /**
-     * @dev The range of possible pool prices.
+     * @dev The range of possible swap prices.
      */
-    Range private _poolPriceRangeX18;
+    Range private _swapPriceRangeX18;
 
     /**
-     * @dev The range of possible pool prices, expressed as the square root of the pool price.
+     * @dev The range of possible swap prices, expressed as the square root of the swap price.
      */
-    Range private _poolPriceSqrtRangeX18;
+    Range private _swapPriceSqrtRangeX18;
 
     /**
      * @dev The fee rate of swaps.
@@ -154,8 +154,8 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         _MVirtual = 0;
         _liquidityVirtual = 0;
 
-        _poolPriceRangeX18 = Range(0, 0, false, false);
-        _poolPriceSqrtRangeX18 = Range(0, 0, false, false);
+        _swapPriceRangeX18 = Range(0, 0, false, false);
+        _swapPriceSqrtRangeX18 = Range(0, 0, false, false);
 
         _feeRate = ud(0);
 
@@ -167,25 +167,25 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      */
     function _recalculatePricingCurve() internal {
         if (_curveType == _CSMM) {
-            _liquidityVirtual = _EReserve * _poolPriceRangeX18.min / 1e18 + _MReserve;
+            _liquidityVirtual = _EReserve * _swapPriceRangeX18.min / 1e18 + _MReserve;
         } else if (_curveType == _CPMM) {
             _liquidityVirtual = Math.sqrt(_EReserve * _MReserve);
         } else if (_curveType == _CLMM) {
-            UD60x18 a = convert(1) - ud(_poolPriceSqrtRangeX18.min * 1e18 / _poolPriceSqrtRangeX18.max);
-            uint256 v1 = _EReserve * _poolPriceSqrtRangeX18.min / 1e18;
-            uint256 v2 = _MReserve * 1e18 / _poolPriceSqrtRangeX18.max;
+            UD60x18 a = convert(1) - ud(_swapPriceSqrtRangeX18.min * 1e18 / _swapPriceSqrtRangeX18.max);
+            uint256 v1 = _EReserve * _swapPriceSqrtRangeX18.min / 1e18;
+            uint256 v2 = _MReserve * 1e18 / _swapPriceSqrtRangeX18.max;
             uint256 b1 = v1 + v2;
             uint256 b2 = v1 > v2 ? v1 - v2 : v2 - v1;
             uint256 c = _EReserve * _MReserve;
 
             _liquidityVirtual = (b1 + Math.sqrt(b2 ** 2 + 4 * c)) * 1e18 / (2 * a.unwrap());
         } else if (_curveType == _CLMM_PARTIAL_MIN) {
-            uint256 b = _EReserve * _poolPriceSqrtRangeX18.min / 1e18;
+            uint256 b = _EReserve * _swapPriceSqrtRangeX18.min / 1e18;
             uint256 c = _EReserve * _MReserve;
 
             _liquidityVirtual = (b + Math.sqrt(b ** 2 + 4 * c)) / 2;
         } else if (_curveType == _CLMM_PARTIAL_MAX) {
-            uint256 b = _MReserve * 1e18 / _poolPriceSqrtRangeX18.max;
+            uint256 b = _MReserve * 1e18 / _swapPriceSqrtRangeX18.max;
             uint256 c = _EReserve * _MReserve;
 
             _liquidityVirtual = (b + Math.sqrt(b ** 2 + 4 * c)) / 2;
@@ -193,16 +193,16 @@ contract EnergyAMM is Ownable, IEnergyAMM {
             require(false, "Unknown curve type.");
         }
 
-        if (_liquidityVirtual == 0 || !_poolPriceSqrtRangeX18.isMaxBounded) {
+        if (_liquidityVirtual == 0 || !_swapPriceSqrtRangeX18.isMaxBounded) {
             _EVirtual = 0;
         } else {
-            _EVirtual = _liquidityVirtual * 1e18 / _poolPriceSqrtRangeX18.max;
+            _EVirtual = _liquidityVirtual * 1e18 / _swapPriceSqrtRangeX18.max;
         }
 
-        if (_liquidityVirtual == 0 || !_poolPriceSqrtRangeX18.isMinBounded) {
+        if (_liquidityVirtual == 0 || !_swapPriceSqrtRangeX18.isMinBounded) {
             _MVirtual = 0;
         } else {
-            _MVirtual = _liquidityVirtual * _poolPriceSqrtRangeX18.min / 1e18;
+            _MVirtual = _liquidityVirtual * _swapPriceSqrtRangeX18.min / 1e18;
         }
     }
 
@@ -314,15 +314,15 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function poolPriceRange() external view returns (Range memory) {
-        return _poolPriceRangeX18;
+    function swapPriceRange() external view returns (Range memory) {
+        return _swapPriceRangeX18;
     }
 
     /**
      * @inheritdoc IEnergyAMM
      */
     function poolPrice() external view returns (UD60x18) {
-        return _calculatePrice(_EReserve + _EVirtual, _MReserve + _MVirtual);
+        return _calculatePrice(_EReserve, _MReserve);
     }
 
     /**
@@ -344,7 +344,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      */
     function askRange() external view returns (Range memory) {
         if (_curveType == _CSMM) {
-            return Range(0, _liquidityVirtual * 1e18 / _poolPriceRangeX18.min - _EReserve, false, true);
+            return Range(0, _liquidityVirtual * 1e18 / _swapPriceRangeX18.min - _EReserve, false, true);
         } else if (_curveType == _CPMM) {
             return Range(0, 0, false, false);
         } else if (_curveType == _CLMM) {
@@ -378,7 +378,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         uint256 EReserveNew = _EReserve - EAmount;
         uint256 MReserveNew;
         if (_curveType == _CSMM) {
-            MReserveNew = _liquidityVirtual - EReserveNew * _poolPriceRangeX18.min / 1e18;
+            MReserveNew = _liquidityVirtual - EReserveNew * _swapPriceRangeX18.min / 1e18;
         } else if (_curveType == _CPMM) {
             MReserveNew = _liquidityVirtual ** 2 / EReserveNew;
         } else if (_curveType == _CLMM) {
@@ -402,10 +402,10 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         if (ESwap != 0 && MSwap != 0) {
             UD60x18 price = _calculatePrice(ESwap, MSwap);
 
-            if (_poolPriceRangeX18.isMinBounded && price <= ud(_poolPriceRangeX18.min)) {
-                ESwap = MSwap * 1e18 / _poolPriceRangeX18.min;
-            } else if (_poolPriceRangeX18.isMaxBounded && price >= ud(_poolPriceRangeX18.max)) {
-                MSwap = ESwap * _poolPriceRangeX18.max / 1e18;
+            if (_swapPriceRangeX18.isMinBounded && price <= ud(_swapPriceRangeX18.min)) {
+                ESwap = MSwap * 1e18 / _swapPriceRangeX18.min;
+            } else if (_swapPriceRangeX18.isMaxBounded && price >= ud(_swapPriceRangeX18.max)) {
+                MSwap = ESwap * _swapPriceRangeX18.max / 1e18;
             }
         }
 
@@ -427,7 +427,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         uint256 EReserveNew = _EReserve + EAmount;
         uint256 MReserveNew;
         if (_curveType == _CSMM) {
-            MReserveNew = _liquidityVirtual - EReserveNew * _poolPriceRangeX18.min / 1e18;
+            MReserveNew = _liquidityVirtual - EReserveNew * _swapPriceRangeX18.min / 1e18;
         } else if (_curveType == _CPMM) {
             MReserveNew = _liquidityVirtual ** 2 / EReserveNew;
         } else if (_curveType == _CLMM) {
@@ -451,10 +451,10 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         if (ESwap != 0 && MSwap != 0) {
             UD60x18 price = _calculatePrice(ESwap, MSwap);
 
-            if (_poolPriceRangeX18.isMinBounded && price <= ud(_poolPriceRangeX18.min)) {
-                ESwap = MSwap * 1e18 / _poolPriceRangeX18.min;
-            } else if (_poolPriceRangeX18.isMaxBounded && price >= ud(_poolPriceRangeX18.max)) {
-                MSwap = ESwap * _poolPriceRangeX18.max / 1e18;
+            if (_swapPriceRangeX18.isMinBounded && price <= ud(_swapPriceRangeX18.min)) {
+                ESwap = MSwap * 1e18 / _swapPriceRangeX18.min;
+            } else if (_swapPriceRangeX18.isMaxBounded && price >= ud(_swapPriceRangeX18.max)) {
+                MSwap = ESwap * _swapPriceRangeX18.max / 1e18;
             }
         }
 
@@ -594,7 +594,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function buy(uint256 EAmount) external returns (TradeInfo memory info) {
+    function buy(uint256 EAmount) external returns (SwapInfo memory info) {
         (uint256 ESwap, uint256 MSwap) = this.bidSwap(EAmount);
         uint256 MFee = this.bidFee(EAmount);
 
@@ -608,7 +608,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         info.MAmount = MSwap;
         info.fee = MFee;
         info.poolPrice = this.poolPrice();
-        info.tradePrice = this.bidPrice(EAmount);
+        info.swapPrice = this.bidPrice(EAmount);
         info.slippage = this.bidSlippage(EAmount);
 
         uint256 MAllowance = _MToken.allowance(msg.sender, address(this));
@@ -639,7 +639,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function sell(uint256 EAmount) external returns (TradeInfo memory info) {
+    function sell(uint256 EAmount) external returns (SwapInfo memory info) {
         (uint256 ESwap, uint256 MSwap) = this.askSwap(EAmount);
         uint256 MFee = this.askFee(EAmount);
 
@@ -653,7 +653,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         info.MAmount = MSwap;
         info.fee = MFee;
         info.poolPrice = this.poolPrice();
-        info.tradePrice = this.askPrice(EAmount);
+        info.swapPrice = this.askPrice(EAmount);
         info.slippage = this.askSlippage(EAmount);
 
         uint256 EAllowance = _EToken.allowance(msg.sender, address(this));
@@ -692,11 +692,10 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         info.provider = msg.sender;
         info.op = "addition";
+        info.LShare = LShare;
         info.ELiq = ELiq;
         info.MLiq = MLiq;
-        info.LShare = LShare;
         info.poolPrice = this.poolPrice();
-        info.liqPrice = ud(MLiq * 1e18 / ELiq);
 
         uint256 EAllowance = _EToken.allowance(msg.sender, address(this));
         uint256 MAllowance = _MToken.allowance(msg.sender, address(this));
@@ -743,11 +742,10 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         info.provider = msg.sender;
         info.op = "removal";
+        info.LShare = LShare;
         info.ELiq = ELiq;
         info.MLiq = MLiq;
-        info.LShare = LShare;
         info.poolPrice = this.poolPrice();
-        info.liqPrice = ud(MLiq * 1e18 / ELiq);
 
         require(_EToken.transfer(msg.sender, ELiq));
         require(_MToken.transfer(msg.sender, MLiq));
@@ -786,38 +784,38 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function setPoolPriceRange(Range calldata range) external onlyOwner {
+    function setSwapPriceRange(Range calldata range) external onlyOwner {
         if (!range.isValid()) {
             revert InvalidRange(range);
         }
 
-        _poolPriceRangeX18 = range;
+        _swapPriceRangeX18 = range;
 
-        _poolPriceSqrtRangeX18.isMinBounded = range.isMinBounded;
-        _poolPriceSqrtRangeX18.isMaxBounded = range.isMaxBounded;
-        if (_poolPriceSqrtRangeX18.isMinBounded) {
-            _poolPriceSqrtRangeX18.min = sqrt(ud(range.min)).unwrap();
+        _swapPriceSqrtRangeX18.isMinBounded = range.isMinBounded;
+        _swapPriceSqrtRangeX18.isMaxBounded = range.isMaxBounded;
+        if (_swapPriceSqrtRangeX18.isMinBounded) {
+            _swapPriceSqrtRangeX18.min = sqrt(ud(range.min)).unwrap();
         }
-        if (_poolPriceSqrtRangeX18.isMaxBounded) {
-            _poolPriceSqrtRangeX18.max = sqrt(ud(range.max)).unwrap();
+        if (_swapPriceSqrtRangeX18.isMaxBounded) {
+            _swapPriceSqrtRangeX18.max = sqrt(ud(range.max)).unwrap();
         }
 
-        if (_poolPriceSqrtRangeX18.isMinBounded && _poolPriceSqrtRangeX18.isMaxBounded) {
-            if (_poolPriceSqrtRangeX18.min == _poolPriceSqrtRangeX18.max) {
-                // Pool price is bounded to a single value. Use the Constant Sum pricing curve.
+        if (_swapPriceSqrtRangeX18.isMinBounded && _swapPriceSqrtRangeX18.isMaxBounded) {
+            if (_swapPriceSqrtRangeX18.min == _swapPriceSqrtRangeX18.max) {
+                // Swap price is bounded to a single value. Use the Constant Sum pricing curve.
                 _curveType = _CSMM;
             } else {
-                // Pool price is bounded on both sides, but not to a single value. Use the Concentrated Liquidity pricing curve.
+                // Swap price is bounded on both sides, but not to a single value. Use the Concentrated Liquidity pricing curve.
                 _curveType = _CLMM;
             }
-        } else if (_poolPriceSqrtRangeX18.isMinBounded) {
-            // Pool price is bounded on only the low side. Use a partial Concentrated Liquidity pricing curve.
+        } else if (_swapPriceSqrtRangeX18.isMinBounded) {
+            // Swap price is bounded on only the low side. Use a partial Concentrated Liquidity pricing curve.
             _curveType = _CLMM_PARTIAL_MIN;
-        } else if (_poolPriceSqrtRangeX18.isMaxBounded) {
-            // Pool price is bounded on only the high side. Use a partial Concentrated Liquidity pricing curve.
+        } else if (_swapPriceSqrtRangeX18.isMaxBounded) {
+            // Swap price is bounded on only the high side. Use a partial Concentrated Liquidity pricing curve.
             _curveType = _CLMM_PARTIAL_MAX;
         } else {
-            // Pool price is unbounded. Use the Constant Product pricing curve.
+            // Swap price is unbounded. Use the Constant Product pricing curve.
             _curveType = _CPMM;
         }
 

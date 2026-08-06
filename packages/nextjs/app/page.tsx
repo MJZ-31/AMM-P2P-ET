@@ -39,7 +39,7 @@ const Home: NextPage = () => {
 
     const range = useScaffoldReadContract({
         contractName: "EnergyAMM",
-        functionName: "poolPriceRange",
+        functionName: "swapPriceRange",
     }).data;
 
     const pLo = range?.isMinBounded ? Number(range.min) / 1e18 : undefined;
@@ -67,7 +67,7 @@ const Home: NextPage = () => {
         <>
           <div id="overview" className="flex flex-row">
             <div id="price-history" className="relative m-4 w-1/2 aspect-1/1">
-              <HistoryGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} poolPriceMin={pLo} poolPriceMax={pHi}/><br/>
+              <HistoryGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} swapPriceMin={pLo} swapPriceMax={pHi}/><br/>
               <select id="time-select" defaultValue="Day" onChange={updateTimeRange}>
                 <option value="Minute">Minute</option>
                 <option value="Hour">Hour</option>
@@ -79,7 +79,7 @@ const Home: NextPage = () => {
             </div>
             <div id="info" className="flex flex-col m-4 w-1/2">
               <p>Pool Price: {p}</p>
-              <p>Pool Price Range: {pLo} - {pHi}</p>
+              <p>Swap Price Range: {pLo} - {pHi}</p>
               <p>Liquidity: {L}</p>
             </div>
           </div>

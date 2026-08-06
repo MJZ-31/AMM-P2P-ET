@@ -33,16 +33,16 @@ error InsufficientAllowance(IERC20 token, uint256 required, uint256 allowance);
 error ZeroTransfer();
 
 /**
- * @notice Information about a trade.
+ * @notice Information about a swap.
  */
-struct TradeInfo {
+struct SwapInfo {
     address trader;
     string op;
     uint256 EAmount;
     uint256 MAmount;
     uint256 fee;
     UD60x18 poolPrice;
-    UD60x18 tradePrice;
+    UD60x18 swapPrice;
     SD59x18 slippage;
 }
 
@@ -52,11 +52,10 @@ struct TradeInfo {
 struct LiquidityInfo {
     address provider;
     string op;
+    uint256 LShare;
     uint256 ELiq;
     uint256 MLiq;
-    uint256 LShare;
     UD60x18 poolPrice;
-    UD60x18 liqPrice;
 }
 
 /**
@@ -106,13 +105,13 @@ interface IEnergyAMM {
     function liquidity() external view returns (uint256);
 
     /**
-     * @notice Returns the range of possible values for the pool price.
-     * @return The pool price range.
+     * @notice Returns the range of possible swap prices.
+     * @return The swap price range.
      */
-    function poolPriceRange() external view returns (Range memory);
+    function swapPriceRange() external view returns (Range memory);
 
     /**
-     * @notice Returns the MToken per EToken price of energy in the market.
+     * @notice Returns the MToken per EToken pool price in the market.
      * @return The pool price.
      */
     function poolPrice() external view returns (UD60x18);
@@ -199,10 +198,8 @@ interface IEnergyAMM {
      * @notice Returns the amount of MTokens and ETokens required to add a certain amount of liquidity to the market.
      * @param LAmount The amount of liquidity being added to the market.
      * @return LShare The amount of LTokens that will be minted and transferred to the sender.
-     * @return ELiq The amount of ETokens that will be transferred from the sender to the liquidity pool. This may be
-     * lower than MAmount to keep the addition price point in the pool price range.
-     * @return MLiq The amount of MTokens that will be transferred from the sender to the liquidity pool. This may be
-     * lower than MAmount to keep the addition price point in the pool price range.
+     * @return ELiq The amount of ETokens that will be transferred from the sender to the liquidity pool.
+     * @return MLiq The amount of MTokens that will be transferred from the sender to the liquidity pool.
      */
     function liquidityProvision(uint256 LAmount) external view returns (uint256 LShare, uint256 ELiq, uint256 MLiq);
 
@@ -228,9 +225,9 @@ interface IEnergyAMM {
      * to the liquidity pool. The fee will be split among the liquidity providers in proportion to their liquidity
      * shares.
      * @param EAmount The amount of ETokens being bought.
-     * @return Information about the trade.
+     * @return Information about the swap.
      */
-    function buy(uint256 EAmount) external returns (TradeInfo memory);
+    function buy(uint256 EAmount) external returns (SwapInfo memory);
 
     /**
      * @notice Executes a market swap to sell ETokens. The requested amount of ETokens will be transferred from the
@@ -238,9 +235,9 @@ interface IEnergyAMM {
      * liquidity pool to the sender. The fee will be split among the liquidity providers in proportion to their
      * liquidity shares.
      * @param EAmount The amount of ETokens being sold.
-     * @return Information about the trade.
+     * @return Information about the swap.
      */
-    function sell(uint256 EAmount) external returns (TradeInfo memory);
+    function sell(uint256 EAmount) external returns (SwapInfo memory);
 
     /**
      * @notice Executes a liquidity addition. The required amount of MTokens and ETokens will be transferred from the
@@ -260,10 +257,10 @@ interface IEnergyAMM {
     function removeLiquidity(uint256 LAmount) external returns (LiquidityInfo memory);
 
     /**
-     * @notice Sets the pool price range.
-     * @param range The pool price range.
+     * @notice Sets the swap price range.
+     * @param range The swap price range.
      */
-    function setPoolPriceRange(Range memory range) external;
+    function setSwapPriceRange(Range memory range) external;
 
     /**
      * @notice Sets the fee rate.

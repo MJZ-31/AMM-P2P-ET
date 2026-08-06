@@ -61,14 +61,14 @@ contract EnergyAMMTest is Test {
         MToken.mint(trader, 1e25);
         vm.stopPrank();
 
-        Range memory poolPriceRange;
-        poolPriceRange.max = vm.randomUint() % (1e25 - 1e17) + 1e17;
-        poolPriceRange.min = vm.randomUint() % (poolPriceRange.max - 1e10) + 1e10;
-        poolPriceRange.isMinBounded = vm.randomBool();
-        poolPriceRange.isMaxBounded = vm.randomBool();
+        Range memory swapPriceRange;
+        swapPriceRange.max = vm.randomUint() % (1e25 - 1e17) + 1e17;
+        swapPriceRange.min = vm.randomUint() % (swapPriceRange.max - 1e10) + 1e10;
+        swapPriceRange.isMinBounded = vm.randomBool();
+        swapPriceRange.isMaxBounded = vm.randomBool();
 
         vm.prank(owner);
-        AMM.setPoolPriceRange(poolPriceRange);
+        AMM.setSwapPriceRange(swapPriceRange);
 
         UD60x18 feeRate = ud(vm.randomUint() % 1e18);
 
@@ -109,12 +109,12 @@ contract EnergyAMMTest is Test {
         assertEq(AMM.liquidity(), AMM.LToken().totalSupply());
     }
 
-    function testFuzz_poolPriceRange() public {
-        assert(AMM.poolPriceRange().isValid());
+    function testFuzz_swapPriceRange() public {
+        assert(AMM.swapPriceRange().isValid());
     }
 
     function testFuzz_poolPrice() public {
-        assert(AMM.poolPriceRange().contains(AMM.poolPrice().unwrap()));
+        assertEq(AMM.poolPrice().unwrap(), AMM.MReserve() * 1e18 / AMM.EReserve());
     }
 
     function testFuzz_bidSwap(uint256 EAmount) public {
@@ -137,7 +137,7 @@ contract EnergyAMMTest is Test {
             EAmount = clampRange(EAmount, bidRange);
             UD60x18 bidPrice = AMM.bidPrice(EAmount);
             if (bidPrice != convert(0)) {
-                assert(AMM.poolPriceRange().contains(bidPrice.unwrap()));
+                assert(AMM.swapPriceRange().contains(bidPrice.unwrap()));
             }
         }
     }
@@ -148,7 +148,7 @@ contract EnergyAMMTest is Test {
             EAmount = clampRange(EAmount, askRange);
             UD60x18 askPrice = AMM.askPrice(EAmount);
             if (askPrice != convert(0)) {
-                assert(AMM.poolPriceRange().contains(askPrice.unwrap()));
+                assert(AMM.swapPriceRange().contains(askPrice.unwrap()));
             }
         }
     }
