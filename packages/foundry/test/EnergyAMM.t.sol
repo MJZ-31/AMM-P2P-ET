@@ -63,7 +63,7 @@ contract EnergyAMMTest is Test {
 
         Range memory swapPriceRange;
         swapPriceRange.max = vm.randomUint() % (1e25 - 1e17) + 1e17;
-        swapPriceRange.min = vm.randomUint() % (swapPriceRange.max - 1e10) + 1e10;
+        swapPriceRange.min = vm.randomUint() % swapPriceRange.max;
         swapPriceRange.isMinBounded = vm.randomBool();
         swapPriceRange.isMaxBounded = vm.randomBool();
 
@@ -76,7 +76,7 @@ contract EnergyAMMTest is Test {
         AMM.setFeeRate(feeRate);
 
         uint256 LAmount = vm.randomUint() % 1e25;
-        (uint256 LShare, uint256 ELiq, uint256 MLiq) = AMM.liquidityProvision(LAmount);
+        (, uint256 ELiq, uint256 MLiq) = AMM.liquidityProvision(LAmount);
 
         vm.startPrank(liquidityProvider);
         EToken.approve(address(AMM), ELiq);
@@ -149,6 +149,38 @@ contract EnergyAMMTest is Test {
             UD60x18 askPrice = AMM.askPrice(EAmount);
             if (askPrice != convert(0)) {
                 assert(AMM.swapPriceRange().contains(askPrice.unwrap()));
+            }
+        }
+    }
+
+    function testFuzz_buy(uint256 EAmount) public {
+        Range memory bidRange = AMM.bidRange();
+        if (bidRange.isValid()) {
+            EAmount = EAmount % 1e20;
+            EAmount = clampRange(EAmount, bidRange);
+            (uint256 ESwap, uint256 MSwap) = AMM.bidSwap(EAmount);
+            uint256 MFee = AMM.bidFee(EAmount);
+            vm.assume(MSwap + MFee < MToken.balanceOf(trader));
+            if (ESwap != 0 && MSwap != 0) {
+                vm.startPrank(trader);
+                MToken.approve(address(AMM), MSwap + MFee);
+                AMM.buy(EAmount);
+                vm.stopPrank();
+            }
+        }
+    }
+
+    function testFuzz_sell(uint256 EAmount) public {
+        Range memory askRange = AMM.askRange();
+        if (askRange.isValid()) {
+            EAmount = EAmount % EToken.balanceOf(trader);
+            EAmount = clampRange(EAmount, askRange);
+            (uint256 ESwap, uint256 MSwap) = AMM.askSwap(EAmount);
+            if (ESwap != 0 && MSwap != 0) {
+                vm.startPrank(trader);
+                EToken.approve(address(AMM), ESwap);
+                AMM.sell(EAmount);
+                vm.stopPrank();
             }
         }
     }
