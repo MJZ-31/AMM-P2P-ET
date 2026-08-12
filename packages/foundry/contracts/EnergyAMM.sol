@@ -138,9 +138,15 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     uint256 private _curveType;
 
     constructor(IERC20Metadata EToken_, IERC20Metadata MToken_) Ownable(msg.sender) {
-        require(address(EToken_) != address(0), "Invalid EToken contract address");
-        require(address(MToken_) != address(0), "Invalid MToken contract address");
-        require(address(EToken_) != address(MToken_), "EToken and MToken contract addresses must be different");
+        if (address(EToken_) == address(0)) {
+            revert("Invalid EToken contract address");
+        }
+        if (address(MToken_) == address(0)) {
+            revert("Invalid MToken contract address");
+        }
+        if (address(EToken_) == address(MToken_)) {
+            revert("EToken and MToken contract addresses must be different");
+        }
 
         _EToken = EToken_;
         _MToken = MToken_;
@@ -190,7 +196,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
             _liquidityVirtual = (b + Math.sqrt(b ** 2 + 4 * c)) / 2;
         } else {
-            require(false, "Unknown curve type.");
+            revert("Unknown curve type");
         }
 
         if (_liquidityVirtual == 0 || !_swapPriceSqrtRangeX18.isMaxBounded) {
@@ -249,7 +255,9 @@ contract EnergyAMM is Ownable, IEnergyAMM {
             }
         }
 
-        require(_LToken.totalSupply() == liquidityNew_, "Liquidity distribution failed.");
+        if (_LToken.totalSupply() != liquidityNew_) {
+            revert("Liquidity distribution failed");
+        }
     }
 
     /**
@@ -336,17 +344,45 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @inheritdoc IEnergyAMM
      */
     function bidRange() external view returns (Range memory) {
-        return Range(0, _EReserve, false, true);
+        if (_EReserve == 0) {
+            return Range(1, 0, true, true);
+        }
+
+        if (_curveType == _CSMM) {
+            return Range(0, _EReserve, false, true);
+        } else if (_curveType == _CPMM) {
+            if (_EReserve == 0) {
+                return Range(1, 0, true, true);
+            } else {
+                return Range(0, _EReserve - 1, false, true);
+            }
+        } else if (_curveType == _CLMM) {
+            return Range(0, _EReserve, false, true);
+        } else if (_curveType == _CLMM_PARTIAL_MIN) {
+            if (_EReserve == 0) {
+                return Range(1, 0, true, true);
+            } else {
+                return Range(0, _EReserve - 1, false, true);
+            }
+        } else if (_curveType == _CLMM_PARTIAL_MAX) {
+            return Range(0, _EReserve, false, true);
+        } else {
+            revert("Unknown curve type");
+        }
     }
 
     /**
      * @inheritdoc IEnergyAMM
      */
     function askRange() external view returns (Range memory) {
+        if (_MReserve == 0) {
+            return Range(1, 0, true, true);
+        }
+
         if (_curveType == _CSMM) {
             return Range(0, _liquidityVirtual * 1e18 / _swapPriceRangeX18.min - _EReserve, false, true);
         } else if (_curveType == _CPMM) {
-            return Range(0, 0, false, false);
+            return Range(0, type(uint256).max / 1e18, false, true);
         } else if (_curveType == _CLMM) {
             if (_EReserve + _EVirtual > _liquidityVirtual ** 2 / _MVirtual) {
                 return Range(0, 0, false, true);
@@ -360,9 +396,9 @@ contract EnergyAMM is Ownable, IEnergyAMM {
                 return Range(0, _liquidityVirtual ** 2 / _MVirtual - _EReserve, false, true);
             }
         } else if (_curveType == _CLMM_PARTIAL_MAX) {
-            return Range(0, 0, false, false);
+            return Range(0, type(uint256).max / 1e18, false, true);
         } else {
-            require(false, "Unknown curve type.");
+            revert("Unknown curve type");
         }
     }
 
@@ -388,7 +424,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         } else if (_curveType == _CLMM_PARTIAL_MAX) {
             MReserveNew = _liquidityVirtual ** 2 / (EReserveNew + _EVirtual);
         } else {
-            require(false, "Unknown curve type.");
+            revert("Unknown curve type");
         }
 
         ESwap = EAmount;
@@ -433,11 +469,11 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         } else if (_curveType == _CLMM) {
             MReserveNew = _liquidityVirtual ** 2 / (EReserveNew + _EVirtual) - _MVirtual;
         } else if (_curveType == _CLMM_PARTIAL_MIN) {
-            MReserveNew = _liquidityVirtual ** 2 / EReserveNew - _MVirtual;
-        } else if (_curveType == _CLMM_PARTIAL_MAX) {
             MReserveNew = _liquidityVirtual ** 2 / (EReserveNew + _EVirtual);
+        } else if (_curveType == _CLMM_PARTIAL_MAX) {
+            MReserveNew = _liquidityVirtual ** 2 / EReserveNew - _MVirtual;
         } else {
-            require(false, "Unknown curve type.");
+            revert("Unknown curve type");
         }
 
         ESwap = EAmount;
@@ -479,7 +515,7 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     function askFee(uint256 EAmount) external view returns (uint256) {
         (, uint256 MSwap) = this.askSwap(EAmount);
 
-        (, uint256 MSwapWithoutFee) = this.askSwap(EAmount * 1e18 / (convert(1) + _feeRate).unwrap());
+        (, uint256 MSwapWithoutFee) = this.askSwap(EAmount * 1e18 / (ud(1e18) + _feeRate).unwrap());
 
         return MSwap - MSwapWithoutFee;
     }
@@ -615,8 +651,13 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         if (MAllowance < MSwap + MFee) {
             revert InsufficientAllowance(IERC20(_MToken), MSwap + MFee, MAllowance);
         }
-        require(_MToken.transferFrom(msg.sender, address(this), MSwap + MFee), "Failed to transfer from sender.");
-        require(_EToken.transfer(msg.sender, ESwap), "Failed to transfer to sender.");
+
+        if (!_MToken.transferFrom(msg.sender, address(this), MSwap + MFee)) {
+            revert("Failed to transfer from sender");
+        }
+        if (!_EToken.transfer(msg.sender, ESwap)) {
+            revert("Failed to transfer to sender");
+        }
 
         uint256 liquidityOld = _liquidity;
 
@@ -629,9 +670,15 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         _recalculatePricingCurve();
 
-        require(_EReserve == _EToken.balanceOf(address(this)), "Failed to adjust EReserve.");
-        require(_MReserve == _MToken.balanceOf(address(this)), "Failed to adjust MReserve.");
-        require(_liquidity == _LToken.totalSupply(), "Failed to adjust liquidity.");
+        if (_EReserve != _EToken.balanceOf(address(this))) {
+            revert("Failed to adjust EReserve");
+        }
+        if (_MReserve != _MToken.balanceOf(address(this))) {
+            revert("Failed to adjust MReserve");
+        }
+        if (_liquidity != _LToken.totalSupply()) {
+            revert("Failed to adjust liquidity");
+        }
 
         emit MarketStateChanged(this.poolPrice(), _EReserve, _MReserve, _liquidity);
     }
@@ -660,8 +707,12 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         if (EAllowance < ESwap) {
             revert InsufficientAllowance(IERC20(_EToken), ESwap, EAllowance);
         }
-        require(_MToken.transfer(msg.sender, MSwap - MFee));
-        require(_EToken.transferFrom(msg.sender, address(this), ESwap));
+        if (!_MToken.transfer(msg.sender, MSwap - MFee)) {
+            revert("Failed to transfer MTokens");
+        }
+        if (!_EToken.transferFrom(msg.sender, address(this), ESwap)) {
+            revert("Failed to transfer ETokens");
+        }
 
         uint256 liquidityOld = _liquidity;
 
@@ -674,9 +725,15 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         _recalculatePricingCurve();
 
-        require(_EReserve == _EToken.balanceOf(address(this)), "Failed to adjust EReserve.");
-        require(_MReserve == _MToken.balanceOf(address(this)), "Failed to adjust MReserve.");
-        require(_liquidity == _LToken.totalSupply(), "Failed to adjust liquidity.");
+        if (_EReserve != _EToken.balanceOf(address(this))) {
+            revert("Failed to adjust EReserve");
+        }
+        if (_MReserve != _MToken.balanceOf(address(this))) {
+            revert("Failed to adjust MReserve");
+        }
+        if (_liquidity != _LToken.totalSupply()) {
+            revert("Failed to adjust liquidity");
+        }
 
         emit MarketStateChanged(this.poolPrice(), _EReserve, _MReserve, _liquidity);
     }
@@ -705,8 +762,12 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         if (MAllowance < MLiq) {
             revert InsufficientAllowance(IERC20(_MToken), MLiq, MAllowance);
         }
-        require(_EToken.transferFrom(msg.sender, address(this), ELiq));
-        require(_MToken.transferFrom(msg.sender, address(this), MLiq));
+        if (!_EToken.transferFrom(msg.sender, address(this), ELiq)) {
+            revert("Failed to transfer ETokens");
+        }
+        if (!_MToken.transferFrom(msg.sender, address(this), MLiq)) {
+            revert("Failed to transfer MTokens");
+        }
 
         if (_LToken.balanceOf(msg.sender) == 0) {
             _liquidityProviders.push(msg.sender);
@@ -724,9 +785,15 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         _recalculatePricingCurve();
 
-        require(_EReserve == _EToken.balanceOf(address(this)), "Failed to adjust EReserve.");
-        require(_MReserve == _MToken.balanceOf(address(this)), "Failed to adjust MReserve.");
-        require(_liquidity == _LToken.totalSupply(), "Failed to adjust liquidity.");
+        if (_EReserve != _EToken.balanceOf(address(this))) {
+            revert("Failed to adjust EReserve");
+        }
+        if (_MReserve != _MToken.balanceOf(address(this))) {
+            revert("Failed to adjust MReserve");
+        }
+        if (_liquidity != _LToken.totalSupply()) {
+            revert("Failed to adjust liquidity");
+        }
 
         emit MarketStateChanged(this.poolPrice(), _EReserve, _MReserve, _liquidity);
     }
@@ -747,8 +814,12 @@ contract EnergyAMM is Ownable, IEnergyAMM {
         info.MLiq = MLiq;
         info.poolPrice = this.poolPrice();
 
-        require(_EToken.transfer(msg.sender, ELiq));
-        require(_MToken.transfer(msg.sender, MLiq));
+        if (!_EToken.transfer(msg.sender, ELiq)) {
+            revert("Failed to transfer ETokens");
+        }
+        if (!_MToken.transfer(msg.sender, MLiq)) {
+            revert("Failed to transfer MTokens");
+        }
 
         if (_LToken.balanceOf(msg.sender) == 0) {
             for (uint256 i = 0; i < _liquidityProviders.length; i++) {
@@ -774,9 +845,15 @@ contract EnergyAMM is Ownable, IEnergyAMM {
 
         _recalculatePricingCurve();
 
-        require(_EReserve == _EToken.balanceOf(address(this)), "Failed to adjust EReserve.");
-        require(_MReserve == _MToken.balanceOf(address(this)), "Failed to adjust MReserve.");
-        require(_liquidity == _LToken.totalSupply(), "Failed to adjust liquidity.");
+        if (_EReserve != _EToken.balanceOf(address(this))) {
+            revert("Failed to adjust EReserve");
+        }
+        if (_MReserve != _MToken.balanceOf(address(this))) {
+            revert("Failed to adjust MReserve");
+        }
+        if (_liquidity != _LToken.totalSupply()) {
+            revert("Failed to adjust liquidity");
+        }
 
         emit MarketStateChanged(this.poolPrice(), _EReserve, _MReserve, _liquidity);
     }
@@ -805,7 +882,8 @@ contract EnergyAMM is Ownable, IEnergyAMM {
                 // Swap price is bounded to a single value. Use the Constant Sum pricing curve.
                 _curveType = _CSMM;
             } else {
-                // Swap price is bounded on both sides, but not to a single value. Use the Concentrated Liquidity pricing curve.
+                // Swap price is bounded on both sides, but not to a single value. Use the Concentrated Liquidity
+                // pricing curve.
                 _curveType = _CLMM;
             }
         } else if (_swapPriceSqrtRangeX18.isMinBounded) {
