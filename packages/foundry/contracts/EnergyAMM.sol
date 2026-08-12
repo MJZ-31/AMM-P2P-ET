@@ -15,8 +15,6 @@ import {
     MarketStateChanged,
     InsufficientAllowance,
     ZeroTransfer,
-    SwapInfo,
-    LiquidityInfo,
     IEnergyAMM
 } from "./IEnergyAMM.sol";
 import { Range, RangeOps, InvalidRange, OutsideRange } from "./Range.sol";
@@ -630,22 +628,13 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function buy(uint256 EAmount) external returns (SwapInfo memory info) {
+    function buy(uint256 EAmount) external {
         (uint256 ESwap, uint256 MSwap) = this.bidSwap(EAmount);
         uint256 MFee = this.bidFee(EAmount);
 
         if (MSwap == 0 || ESwap == 0) {
             revert ZeroTransfer();
         }
-
-        info.trader = msg.sender;
-        info.op = "buy";
-        info.EAmount = ESwap;
-        info.MAmount = MSwap;
-        info.fee = MFee;
-        info.poolPrice = this.poolPrice();
-        info.swapPrice = this.bidPrice(EAmount);
-        info.slippage = this.bidSlippage(EAmount);
 
         uint256 MAllowance = _MToken.allowance(msg.sender, address(this));
         if (MAllowance < MSwap + MFee) {
@@ -686,22 +675,13 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function sell(uint256 EAmount) external returns (SwapInfo memory info) {
+    function sell(uint256 EAmount) external {
         (uint256 ESwap, uint256 MSwap) = this.askSwap(EAmount);
         uint256 MFee = this.askFee(EAmount);
 
         if (ESwap == 0 || MSwap == 0) {
             revert ZeroTransfer();
         }
-
-        info.trader = msg.sender;
-        info.op = "sell";
-        info.EAmount = ESwap;
-        info.MAmount = MSwap;
-        info.fee = MFee;
-        info.poolPrice = this.poolPrice();
-        info.swapPrice = this.askPrice(EAmount);
-        info.slippage = this.askSlippage(EAmount);
 
         uint256 EAllowance = _EToken.allowance(msg.sender, address(this));
         if (EAllowance < ESwap) {
@@ -741,18 +721,11 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function addLiquidity(uint256 LAmount) external returns (LiquidityInfo memory info) {
+    function addLiquidity(uint256 LAmount) external {
         (uint256 LShare, uint256 ELiq, uint256 MLiq) = this.liquidityProvision(LAmount);
         if (LShare == 0 || ELiq == 0 || MLiq == 0) {
             revert ZeroTransfer();
         }
-
-        info.provider = msg.sender;
-        info.op = "addition";
-        info.LShare = LShare;
-        info.ELiq = ELiq;
-        info.MLiq = MLiq;
-        info.poolPrice = this.poolPrice();
 
         uint256 EAllowance = _EToken.allowance(msg.sender, address(this));
         uint256 MAllowance = _MToken.allowance(msg.sender, address(this));
@@ -801,18 +774,11 @@ contract EnergyAMM is Ownable, IEnergyAMM {
     /**
      * @inheritdoc IEnergyAMM
      */
-    function removeLiquidity(uint256 LAmount) external returns (LiquidityInfo memory info) {
+    function removeLiquidity(uint256 LAmount) external {
         (uint256 LShare, uint256 ELiq, uint256 MLiq) = this.liquidityReduction(LAmount);
         if (LShare == 0 || ELiq == 0 || MLiq == 0) {
             revert ZeroTransfer();
         }
-
-        info.provider = msg.sender;
-        info.op = "removal";
-        info.LShare = LShare;
-        info.ELiq = ELiq;
-        info.MLiq = MLiq;
-        info.poolPrice = this.poolPrice();
 
         if (!_EToken.transfer(msg.sender, ELiq)) {
             revert("Failed to transfer ETokens");

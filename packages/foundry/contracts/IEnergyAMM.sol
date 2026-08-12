@@ -33,32 +33,6 @@ error InsufficientAllowance(IERC20 token, uint256 required, uint256 allowance);
 error ZeroTransfer();
 
 /**
- * @notice Information about a swap.
- */
-struct SwapInfo {
-    address trader;
-    string op;
-    uint256 EAmount;
-    uint256 MAmount;
-    uint256 fee;
-    UD60x18 poolPrice;
-    UD60x18 swapPrice;
-    SD59x18 slippage;
-}
-
-/**
- * @notice Information about a liquidity addition or removal.
- */
-struct LiquidityInfo {
-    address provider;
-    string op;
-    uint256 LShare;
-    uint256 ELiq;
-    uint256 MLiq;
-    UD60x18 poolPrice;
-}
-
-/**
  * @title Interface for an energy trading AMM.
  * @author Mitchel Justinen
  */
@@ -225,9 +199,8 @@ interface IEnergyAMM {
      * to the liquidity pool. The fee will be split among the liquidity providers in proportion to their liquidity
      * shares.
      * @param EAmount The amount of ETokens being bought.
-     * @return Information about the swap.
      */
-    function buy(uint256 EAmount) external returns (SwapInfo memory);
+    function buy(uint256 EAmount) external;
 
     /**
      * @notice Executes a market swap to sell ETokens. The requested amount of ETokens will be transferred from the
@@ -235,26 +208,23 @@ interface IEnergyAMM {
      * liquidity pool to the sender. The fee will be split among the liquidity providers in proportion to their
      * liquidity shares.
      * @param EAmount The amount of ETokens being sold.
-     * @return Information about the swap.
      */
-    function sell(uint256 EAmount) external returns (SwapInfo memory);
+    function sell(uint256 EAmount) external;
 
     /**
      * @notice Executes a liquidity addition. The required amount of MTokens and ETokens will be transferred from the
      * sender to the liquidity pool. A corresponding amount of LTokens will be minted and transferred to the sender.
      * @param LAmount The amount of liquidity to add.
-     * @return Information about the liquidity addition.
      */
-    function addLiquidity(uint256 LAmount) external returns (LiquidityInfo memory);
+    function addLiquidity(uint256 LAmount) external;
 
     /**
      * @notice Executes a liquidity removal. The desired amount of LTokens will be transferred from the sender and
      * burned. An amount of MTokens and ETokens in proportion to the amount of LTokens sold will be transferreed from
      * the liquidity pool to the sender.
      * @param LAmount The amount of LTokens being sold.
-     * @return Information about the liquidity removal.
      */
-    function removeLiquidity(uint256 LAmount) external returns (LiquidityInfo memory);
+    function removeLiquidity(uint256 LAmount) external;
 
     /**
      * @notice Sets the swap price range.
