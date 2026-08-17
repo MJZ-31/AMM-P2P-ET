@@ -197,15 +197,11 @@ contract EnergyAMM is Ownable, IEnergyAMM {
             revert("Unknown curve type");
         }
 
-        if (_liquidityVirtual == 0 || !_swapPriceSqrtRangeX18.isMaxBounded) {
-            _EVirtual = 0;
-        } else {
+        if (_curveType == _CLMM || _curveType == _CLMM_PARTIAL_MAX) {
             _EVirtual = _liquidityVirtual * 1e18 / _swapPriceSqrtRangeX18.max;
         }
 
-        if (_liquidityVirtual == 0 || !_swapPriceSqrtRangeX18.isMinBounded) {
-            _MVirtual = 0;
-        } else {
+        if (_curveType == _CLMM || _curveType == _CLMM_PARTIAL_MIN) {
             _MVirtual = _liquidityVirtual * _swapPriceSqrtRangeX18.min / 1e18;
         }
     }
@@ -328,7 +324,19 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @inheritdoc IEnergyAMM
      */
     function poolPrice() external view returns (UD60x18) {
-        return _calculatePrice(_EReserve, _MReserve);
+        if (_curveType == _CSMM) {
+            return _calculatePrice(_EReserve, _MReserve);
+        } else if (_curveType == _CPMM) {
+            return _calculatePrice(_EReserve, _MReserve);
+        } else if (_curveType == _CLMM) {
+            return _calculatePrice(_EReserve + _EVirtual, _MReserve + _MVirtual);
+        } else if (_curveType == _CLMM_PARTIAL_MIN) {
+            return _calculatePrice(_EReserve, _MReserve + _MVirtual);
+        } else if (_curveType == _CLMM_PARTIAL_MAX) {
+            return _calculatePrice(_EReserve + _EVirtual, _MReserve);
+        } else {
+            revert("Unknown curve type");
+        }
     }
 
     /**
@@ -540,14 +548,38 @@ contract EnergyAMM is Ownable, IEnergyAMM {
      * @inheritdoc IEnergyAMM
      */
     function bidSlippage(uint256 EAmount) external view returns (SD59x18) {
-        return (this.bidPrice(EAmount) / this.poolPrice()).intoSD59x18() - convert(1).intoSD59x18();
+        if (_curveType == _CSMM) {
+            return ud(0).intoSD59x18();
+        } else if (_curveType == _CPMM) {
+            return (this.bidPrice(EAmount) / this.poolPrice()).intoSD59x18() - ud(1e18).intoSD59x18();
+        } else if (_curveType == _CLMM) {
+            return (this.bidPrice(EAmount) / this.poolPrice()).intoSD59x18() - ud(1e18).intoSD59x18();
+        } else if (_curveType == _CLMM_PARTIAL_MIN) {
+            return (this.bidPrice(EAmount) / this.poolPrice()).intoSD59x18() - ud(1e18).intoSD59x18();
+        } else if (_curveType == _CLMM_PARTIAL_MAX) {
+            return (this.bidPrice(EAmount) / this.poolPrice()).intoSD59x18() - ud(1e18).intoSD59x18();
+        } else {
+            revert("Unknown curve type");
+        }
     }
 
     /**
      * @inheritdoc IEnergyAMM
      */
     function askSlippage(uint256 EAmount) external view returns (SD59x18) {
-        return (this.askPrice(EAmount) / this.poolPrice()).intoSD59x18() - convert(1).intoSD59x18();
+        if (_curveType == _CSMM) {
+            return ud(0).intoSD59x18();
+        } else if (_curveType == _CPMM) {
+            return (this.askPrice(EAmount) / this.poolPrice()).intoSD59x18() - ud(1e18).intoSD59x18();
+        } else if (_curveType == _CLMM) {
+            return (this.askPrice(EAmount) / this.poolPrice()).intoSD59x18() - ud(1e18).intoSD59x18();
+        } else if (_curveType == _CLMM_PARTIAL_MIN) {
+            return (this.askPrice(EAmount) / this.poolPrice()).intoSD59x18() - ud(1e18).intoSD59x18();
+        } else if (_curveType == _CLMM_PARTIAL_MAX) {
+            return (this.askPrice(EAmount) / this.poolPrice()).intoSD59x18() - ud(1e18).intoSD59x18();
+        } else {
+            revert("Unknown curve type");
+        }
     }
 
     /**
