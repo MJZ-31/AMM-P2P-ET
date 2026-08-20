@@ -115,8 +115,10 @@ contract EnergyAMMTest is Test {
 
     function testFuzz_poolPrice() public {
         Range memory swapPriceRange = AMM.swapPriceRange();
-        if (swapPriceRange.min != swapPriceRange.max) {
+        if (swapPriceRange.min == swapPriceRange.max && swapPriceRange.isMinBounded && swapPriceRange.isMaxBounded) {
             assertEq(AMM.poolPrice().unwrap(), AMM.MReserve() * 1e18 / AMM.EReserve());
+        } else {
+            assert(swapPriceRange.contains(AMM.poolPrice().unwrap()));
         }
     }
 
